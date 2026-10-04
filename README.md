@@ -7,8 +7,7 @@ work in once, then reconstruct it on another computer with a single command.
 
 > **Status: early development.** The CLI runs and restoration, capture, and
 > local-network transfer work on Linux, macOS, and Windows, but remote transfer
-> is not implemented yet. See [Current status](#current-status) and
-> [Roadmap](#roadmap).
+> is not implemented yet.
 
 ## Installation
 
