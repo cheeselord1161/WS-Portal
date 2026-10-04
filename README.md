@@ -1,6 +1,6 @@
-# WSPortal
+# Workspac Portal
 
-> **WSPortal — portable workspaces, anywhere.**
+> **Workspace Portal — portable workspaces, anywhere.**
 
 WSPortal makes your working environment portable. Describe the environment you
 work in once, then reconstruct it on another computer with a single command.
