@@ -14,7 +14,7 @@ work in once, then reconstruct it on another computer with a single command.
 ### Prebuilt binaries
 
 Download the archive for your platform from the
-[releases page](https://github.com/cheeselord1161/WS_Portal/releases). Each
+[releases page](https://github.com/cheeselord1161/WS-Portal/releases). Each
 release ships:
 
 | Platform | Architectures |
@@ -32,7 +32,7 @@ release includes a `checksums.txt`. Unpack the archive and put `ws` (or
 If you have Go 1.24 or newer:
 
 ```bash
-go install github.com/cheeselord1161/WS_Portal/cmd/ws@latest
+go install github.com/cheeselord1161/WS-Portal/cmd/ws@latest
 ```
 
 This installs `ws` to `$(go env GOPATH)/bin`.
@@ -40,8 +40,8 @@ This installs `ws` to `$(go env GOPATH)/bin`.
 ### From source
 
 ```bash
-git clone https://github.com/cheeselord1161/WS_Portal.git
-cd WS_Portal
+git clone https://github.com/cheeselord1161/WS-Portal.git
+cd WS-Portal
 make build          # or: go build -o ws ./cmd/ws
 ```
 
