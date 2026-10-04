@@ -1,4 +1,4 @@
-# Workspac Portal
+# Workspace Portal
 
 > **Workspace Portal — portable workspaces, anywhere.**
 
