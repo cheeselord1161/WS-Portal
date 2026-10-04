@@ -14,7 +14,7 @@ work in once, then reconstruct it on another computer with a single command.
 ### Prebuilt binaries
 
 Download the archive for your platform from the
-[releases page](https://github.com/cheeselord1161/WS-Portal/releases). Each
+[releases page](https://github.com/cheeselord1161/WS_Portal/releases). Each
 release ships:
 
 | Platform | Architectures |
@@ -32,7 +32,7 @@ release includes a `checksums.txt`. Unpack the archive and put `ws` (or
 If you have Go 1.24 or newer:
 
 ```bash
-go install github.com/cheeselord1161/WS-Portal/cmd/ws@latest
+go install github.com/cheeselord1161/WS_Portal/cmd/ws@latest
 ```
 
 This installs `ws` to `$(go env GOPATH)/bin`.
@@ -40,8 +40,8 @@ This installs `ws` to `$(go env GOPATH)/bin`.
 ### From source
 
 ```bash
-git clone https://github.com/cheeselord1161/WS-Portal.git
-cd WS-Portal
+git clone https://github.com/cheeselord1161/WS_Portal.git
+cd WS_Portal
 make build          # or: go build -o ws ./cmd/ws
 ```
 
@@ -182,6 +182,7 @@ ws
 ├── receive     Receive a workspace from another machine (LAN)
 ├── list        List locally available workspaces
 ├── version     Print version information
+├── doctor      Check the local environment for restore dependencies
 └── completion  Generate shell completion scripts
 ```
 
@@ -197,7 +198,10 @@ ws validate myproject
 ws resume myproject
 ws resume myproject --execute
 ws list
+ws doctor
 ```
+
+`ws doctor` reports which tools and applications this machine has for restoring a workspace — Git, VS Code, Chrome, and so on. Use it before `ws resume` to see what is missing.
 
 ## Transfer modes
 
