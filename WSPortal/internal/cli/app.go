@@ -6,8 +6,10 @@
 package cli
 
 import (
+	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/cheeselord1161/WS_Portal/internal/config"
 	"github.com/cheeselord1161/WS_Portal/internal/platform"
@@ -71,7 +73,58 @@ func (a *App) NewRootCommand() *cobra.Command {
 		a.newReceiveCommand(),
 		a.newListCommand(),
 		a.newVersionCommand(),
+		a.newDoctorCommand(),
 	)
 
 	return root
+}
+
+func (a *App) newDoctorCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "doctor",
+		Short: "Check the local environment for workspace restore dependencies",
+		Long: "Inspect the local machine and report what WSPortal can and cannot " +
+			"restore yet. Each finding is a human-readable line (for example " +
+			"✓ Git, ✗ PostgreSQL not installed). Exits 0 when every checked " +
+			"dependency is present; exits 1 when at least one required dependency " +
+			"is missing.\n" +
+			"\n" +
+			"Doctor does not make any changes to your machine.",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if a.Platform == nil {
+				fmt.Fprintln(a.Out, "platform: unknown")
+			}
+
+			var missing []string
+
+			if a.Platform != nil && a.Platform.Tools != nil {
+				for _, tool := range a.Platform.Tools.Ordered() {
+					if _, ok := a.Platform.Tools.LookPath(tool); ok {
+						fmt.Fprintf(a.Out, "✓ %s\n", tool)
+					} else {
+						fmt.Fprintf(a.Out, "✗ %s (not installed)\n", tool)
+						missing = append(missing, tool)
+					}
+				}
+			}
+
+			if p := a.Platform; p != nil {
+				if p.Apps != nil {
+					for _, name := range []string{"vscode", "code"} {
+						if p.Apps.Available(name) {
+							fmt.Fprintf(a.Out, "✓ %s\n", name)
+						}
+					}
+				}
+			}
+
+			if len(missing) > 0 {
+				fmt.Fprintf(a.Out, "\n%d warning(s) found.\n", len(missing))
+				return fmt.Errorf("missing tools: %s", strings.Join(missing, ", "))
+			}
+			fmt.Fprintf(a.Out, "\nNo missing dependencies found.\n")
+			return nil
+		},
+	}
 }

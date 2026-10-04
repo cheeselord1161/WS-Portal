@@ -9,12 +9,10 @@
 //     preferring a direct connection, then NAT traversal, then a short-lived
 //     encrypted relay.
 //
-// Only the interfaces and placeholders exist today. No networking is
-// implemented.
+// LAN is implemented today. Remote is not yet implemented.
 package transfer
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/cheeselord1161/WS_Portal/internal/workspace"
@@ -56,29 +54,4 @@ const (
 	ModeRemote Mode = "remote"
 )
 
-// ErrNotImplemented is returned by the placeholder implementations.
-var ErrNotImplemented = fmt.Errorf("transfer is not implemented yet")
 
-// PlaceholderSender is a Sender that reports transfer as unimplemented.
-type PlaceholderSender struct {
-	// Mode is the mode this sender would use.
-	Mode Mode
-}
-
-// Send implements Sender.
-func (s PlaceholderSender) Send(*workspace.Workspace) (*Receipt, error) {
-	// TODO(transfer): implement LAN discovery and the remote relay client.
-	return nil, fmt.Errorf("%s transfer: %w", s.Mode, ErrNotImplemented)
-}
-
-// PlaceholderReceiver is a Receiver that reports transfer as unimplemented.
-type PlaceholderReceiver struct {
-	// Mode is the mode this receiver would use.
-	Mode Mode
-}
-
-// Receive implements Receiver.
-func (r PlaceholderReceiver) Receive(string) (*workspace.Workspace, error) {
-	// TODO(transfer): implement LAN discovery and the remote relay client.
-	return nil, fmt.Errorf("%s transfer: %w", r.Mode, ErrNotImplemented)
-}
