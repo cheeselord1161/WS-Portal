@@ -58,6 +58,9 @@ type Step struct {
 	// Reason explains a non-ready status.
 	Reason string
 
+	// AppID is the canonical logical application id a step resolves to,
+	// for example "vscode". It is what the platform launcher receives.
+	AppID string
 	// Open lists the resolved paths an application step should open.
 	Open []string
 	// Tabs lists the resolved URLs a browser step should open.

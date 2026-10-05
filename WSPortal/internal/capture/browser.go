@@ -52,16 +52,6 @@ func NewBrowserSource(home string) Source {
 	var bases []browserBase
 	var firefoxDirs []string
 	switch runtime.GOOS {
-	case "darwin":
-		base := filepath.Join(home, "Library", "Application Support")
-		bases = append(bases,
-			browserBase{"chrome", filepath.Join(base, "Google", "Chrome")},
-			browserBase{"chromium", filepath.Join(base, "Chromium")},
-			browserBase{"brave", filepath.Join(base, "BraveSoftware", "Brave-Browser")},
-			browserBase{"edge", filepath.Join(base, "Microsoft Edge")},
-			browserBase{"vivaldi", filepath.Join(base, "Vivaldi")},
-		)
-		firefoxDirs = append(firefoxDirs, filepath.Join(base, "Firefox", "Profiles"))
 	case "windows":
 		base := os.Getenv("LOCALAPPDATA")
 		if base == "" {
@@ -179,21 +169,21 @@ func sessionDirs(userDataDir string) []string {
 }
 
 // readSessionURLs reads the newest session file in a Sessions directory and
-// extracts the page URLs it contains.
+// extracts the page URLs of its open tabs.
 func readSessionURLs(sessionsDir string) []string {
 	file := newestSessionFile(sessionsDir)
 	if file == "" {
 		return nil
 	}
-	f, err := os.Open(file)
-	if err != nil {
+	data := readFileLimited(file)
+	if len(data) == 0 {
 		return nil
 	}
-	defer f.Close()
-
-	data, err := io.ReadAll(io.LimitReader(f, maxSessionFileSize))
-	if err != nil {
-		return nil
+	// Prefer reconstructing the open tabs from the session command stream; a raw
+	// scan would also pick up every back/forward history entry. Fall back to the
+	// scanner for files in an unexpected format.
+	if urls, ok := chromiumSessionURLs(data); ok {
+		return urls
 	}
 	return extractSessionURLs(data)
 }
@@ -249,12 +239,12 @@ func extractSessionURLs(data []byte) []string {
 		for end < len(data) && isURLByte(data[end]) {
 			end++
 		}
-		raw := strings.TrimRight(string(data[i:end]), ".,;:!?)\"'")
+		candidate := string(data[i:end])
 		i = end
-		if len(raw) < len("http://")+1 || !isPageURL(raw) {
+		tab := acceptedURL(candidate)
+		if tab == "" {
 			continue
 		}
-		tab := normalizeTabURL(raw)
 		if seen[tab] {
 			continue
 		}

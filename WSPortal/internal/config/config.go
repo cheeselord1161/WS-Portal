@@ -40,8 +40,7 @@ func Load() (*Config, error) {
 
 // DefaultWorkspaceDir returns the per-user directory for stored workspaces.
 //
-// It follows the platform conventions: XDG on Linux, Application Support on
-// macOS, and AppData on Windows.
+// It follows the platform conventions: XDG on Linux and AppData on Windows.
 func DefaultWorkspaceDir() (string, error) {
 	// An explicit override always wins; useful for tests and for users who
 	// keep their workspaces on a shared drive.

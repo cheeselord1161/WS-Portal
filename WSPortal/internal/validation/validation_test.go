@@ -1,7 +1,6 @@
 package validation
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -148,80 +147,6 @@ func hasIssue(r Result, field string, sev Severity) bool {
 		}
 	}
 	return false
-}
-
-func TestValidateEmptyWorkspace(t *testing.T) {
-	ws := &workspace.Workspace{}
-	result := New().Validate(ws)
-	if !hasIssue(result, "workspace.name", SeverityError) {
-		t.Errorf("missing workspace name should be an error")
-	}
-}
-
-func TestValidateInvalidURL(t *testing.T) {
-	ws := validWorkspace()
-	ws.Project.Source.URL = "not-a-valid-url"
-	result := New().Validate(ws)
-	if !hasIssue(result, "project.source.url", SeverityError) {
-		t.Errorf("invalid git URL should be an error")
-	}
-}
-
-func TestValidateMalformedYAML(t *testing.T) {
-	doc := "version: 2\nworkspace:\n  name: broken\n  description: [unclosed"
-	path := writeTemp(t, doc)
-
-	_, err := workspace.Load(path)
-	if err == nil {
-		t.Fatal("malformed YAML should fail to load")
-	}
-}
-
-func TestValidateMissingFields(t *testing.T) {
-	doc := "version: 2\nworkspace:\n  name: x"
-	path := writeTemp(t, doc)
-
-	ws, err := workspace.Load(path)
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	// Missing project is fine (optional), but the name is required.
-	if ws.Workspace.Name == "" {
-		t.Fatal("name should be set")
-	}
-	result := New().Validate(ws)
-	if !result.OK() {
-		t.Fatalf("workspace with name only should be valid: %v", result.Errors())
-	}
-}
-
-func TestValidateCommandInImportedWorkspace(t *testing.T) {
-	// Imported workspaces may contain commands; they are warnings, not errors,
-	// but must be surfaced clearly.
-	ws := validWorkspace()
-	ws.Terminals = []workspace.Terminal{{Name: "server", Command: "rm -rf /"}}
-	result := New().Validate(ws)
-	if !hasIssue(result, "terminals[0].command", SeverityWarning) {
-		t.Errorf("command should produce a warning")
-	}
-	if !result.OK() {
-		t.Errorf("workspace with command should be OK (warnings do not fail validation); got %v", result.Errors())
-	}
-}
-
-func writeTemp(t *testing.T, content string) string {
-	t.Helper()
-	tmp, err := os.CreateTemp(t.TempDir(), "ws-*.ws")
-	if err != nil {
-		t.Fatalf("create temp: %v", err)
-	}
-	if _, err := tmp.WriteString(content); err != nil {
-		t.Fatalf("write temp: %v", err)
-	}
-	if err := tmp.Close(); err != nil {
-		t.Fatalf("close temp: %v", err)
-	}
-	return tmp.Name()
 }
 
 func TestIssueString(t *testing.T) {

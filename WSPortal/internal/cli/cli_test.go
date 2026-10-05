@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cheeselord1161/WS_Portal/internal/config"
+	"github.com/cheeselord1161/WS_Portal/internal/platform"
 	"github.com/cheeselord1161/WS_Portal/internal/platform/detect"
 	"github.com/cheeselord1161/WS_Portal/internal/validation"
 	"github.com/cheeselord1161/WS_Portal/internal/workspace"
@@ -310,6 +311,96 @@ func TestCaptureOverwriteReplacesExisting(t *testing.T) {
 		if s.Name == "postgres" {
 			t.Errorf("Services = %+v, --overwrite should have discarded postgres", got.Services)
 		}
+	}
+}
+
+// recordingApps is an AppLauncher that records launches instead of opening
+// applications, so CLI tests never touch the developer's machine.
+type recordingApps struct {
+	launched []string
+}
+
+func (r *recordingApps) Resolve(app string) (platform.Application, error) {
+	known, ok := platform.LookupApplication(app)
+	id := platform.CanonicalAppID(app)
+	name := id
+	if ok {
+		name = known.Name
+	}
+	return platform.Application{ID: id, Name: name, Known: ok, Installed: ok}, nil
+}
+
+func (r *recordingApps) Launch(app string, args ...string) error {
+	r.launched = append(r.launched, app)
+	return nil
+}
+
+func (r *recordingApps) Name() string    { return "recording" }
+func (r *recordingApps) Supported() bool { return true }
+
+// withRecordingApps installs a fake platform adapter that never launches
+// applications for real.
+func withRecordingApps(app *App) *recordingApps {
+	apps := &recordingApps{}
+	app.Platform = &platform.Adapter{
+		OS:        "linux",
+		Apps:      apps,
+		Browsers:  platform.UnsupportedBrowsers{},
+		Terminals: platform.UnsupportedTerminals{},
+		Services:  platform.UnsupportedServices{},
+		Tools:     platform.NewPathToolChecker(),
+	}
+	return apps
+}
+
+func TestResumePreviewDoesNotLaunchApplications(t *testing.T) {
+	app, out, _ := newTestApp(t)
+	apps := withRecordingApps(app)
+
+	path := filepath.Join(app.Config.WorkspaceDir, "apps.ws")
+	writeFile(t, path, "version: 2\n"+
+		"workspace:\n  name: apps\n"+
+		"applications:\n"+
+		"  - id: vscode\n"+
+		"    open:\n"+
+		"      - ${WORKSPACE_ROOT}/myproject\n")
+
+	if err := app.ExecuteArgs([]string{"resume", "apps"}); err != nil {
+		t.Fatalf("resume: %v", err)
+	}
+
+	if len(apps.launched) != 0 {
+		t.Errorf("preview launched %v, want nothing", apps.launched)
+	}
+	got := out.String()
+	for _, want := range []string{"Applications:", "VS Code", "--execute"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestResumeExecuteLaunchesApplications(t *testing.T) {
+	app, out, _ := newTestApp(t)
+	apps := withRecordingApps(app)
+
+	path := filepath.Join(app.Config.WorkspaceDir, "apps.ws")
+	writeFile(t, path, "version: 2\n"+
+		"workspace:\n  name: apps\n"+
+		"applications:\n"+
+		"  - id: vscode\n"+
+		"    open:\n"+
+		"      - ${WORKSPACE_ROOT}/myproject\n")
+
+	if err := app.ExecuteArgs([]string{"resume", "apps", "--execute"}); err != nil {
+		t.Fatalf("resume --execute: %v", err)
+	}
+
+	if len(apps.launched) != 1 || apps.launched[0] != "vscode" {
+		t.Errorf("launched = %v, want [vscode]", apps.launched)
+	}
+	if !strings.Contains(out.String(), "Restore complete") {
+		t.Errorf("output = %q", out.String())
 	}
 }
 

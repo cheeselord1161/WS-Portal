@@ -78,11 +78,17 @@ var appAliases = map[string][]string{
 	"vscode":   {"code", "code-oss", "codium"},
 	"code":     {"code", "code-oss", "codium"},
 	"vscodium": {"codium"},
+	"cursor":   {"cursor"},
 	"intellij": {"idea"},
 	"idea":     {"idea"},
 	"goland":   {"goland"},
 	"pycharm":  {"pycharm"},
 	"webstorm": {"webstorm"},
+	"phpstorm": {"phpstorm"},
+	"rubymine": {"rubymine"},
+	"clion":    {"clion"},
+	"rider":    {"rider"},
+	"datagrip": {"datagrip"},
 	"sublime":  {"subl", "sublime_text"},
 	"atom":     {"atom"},
 	"neovim":   {"nvim"},
@@ -93,6 +99,13 @@ var appAliases = map[string][]string{
 	"blender":  {"blender"},
 	"postman":  {"postman"},
 	"dbeaver":  {"dbeaver"},
+	"chrome":   {"google-chrome", "google-chrome-stable", "chromium", "chromium-browser"},
+	"chromium": {"chromium", "chromium-browser"},
+	"firefox":  {"firefox"},
+	"brave":    {"brave-browser", "brave"},
+	"edge":     {"microsoft-edge", "microsoft-edge-stable"},
+	"vivaldi":  {"vivaldi"},
+	"opera":    {"opera"},
 }
 
 // AppLauncher implements platform.AppLauncher. It opens a desktop application.
@@ -100,10 +113,82 @@ type AppLauncher struct {
 	adapter *Adapter
 }
 
+// flatpakIDs maps logical application ids to their Flatpak application id, used
+// when no native executable is on PATH (common on Fedora and with Flathub).
+var flatpakIDs = map[string]string{
+	"vscode":   "com.visualstudio.code",
+	"vscodium": "com.vscodium.codium",
+	"cursor":   "com.cursor.Cursor",
+	"chrome":   "com.google.Chrome",
+	"chromium": "org.chromium.Chromium",
+	"firefox":  "org.mozilla.firefox",
+	"edge":     "com.microsoft.Edge",
+	"brave":    "com.brave.Browser",
+	"vivaldi":  "com.vivaldi.Vivaldi",
+	"opera":    "com.opera.Opera",
+	"spotify":  "com.spotify.Client",
+	"slack":    "com.slack.Slack",
+	"gimp":     "org.gimp.GIMP",
+	"inkscape": "org.inkscape.Inkscape",
+	"blender":  "org.blender.Blender",
+	"postman":  "com.postman.Postman",
+	"dbeaver":  "io.dbeaver.DBeaverCommunity",
+	"notion":   "notion.id",
+}
+
+// snapNames maps logical application ids to their snap name, used when no native
+// executable or Flatpak app is available.
+var snapNames = map[string]string{
+	"vscode":   "code",
+	"vscodium": "codium",
+	"chromium": "chromium",
+	"firefox":  "firefox",
+	"brave":    "brave",
+	"edge":     "microsoft-edge",
+	"spotify":  "spotify",
+	"slack":    "slack",
+}
+
+// appLaunch resolves how to start a logical application: a native executable
+// first, then a Flatpak app, then a Snap. It returns the executable and any
+// leading arguments (for example "flatpak run com.visualstudio.code").
+func (a *Adapter) appLaunch(id string) (bin string, prefix []string, ok bool) {
+	if b, found := a.appCommand(id); found {
+		return b, nil, true
+	}
+	if _, err := exec.LookPath("flatpak"); err == nil {
+		if ref, found := flatpakIDs[id]; found && flatpakInstalled(ref) {
+			return "flatpak", []string{"run", ref}, true
+		}
+	}
+	if _, err := exec.LookPath("snap"); err == nil {
+		if name, found := snapNames[id]; found && snapInstalled(name) {
+			return "snap", []string{"run", name}, true
+		}
+	}
+	return "", nil, false
+}
+
+// flatpakInstalled reports whether a Flatpak application is installed.
+func flatpakInstalled(ref string) bool {
+	return exec.Command("flatpak", "info", ref).Run() == nil
+}
+
+// snapInstalled reports whether a snap is installed.
+func snapInstalled(name string) bool {
+	return exec.Command("snap", "list", name).Run() == nil
+}
+
 // appCommand resolves the executable for a logical application name.
 func (a *Adapter) appCommand(app string) (string, bool) {
 	key := strings.ToLower(strings.TrimSpace(app))
 	if key == "" {
+		return "", false
+	}
+	if key == "terminal" {
+		if a.terminalEmulator != "" {
+			return a.terminalEmulator, true
+		}
 		return "", false
 	}
 	for _, bin := range appAliases[key] {
@@ -117,29 +202,47 @@ func (a *Adapter) appCommand(app string) (string, bool) {
 	return "", false
 }
 
-// Launch opens the desktop application with its arguments.
+// Resolve maps a logical application name to its local executable. An unknown
+// name resolves to a Known=false Application rather than an error, so the
+// restore engine can report it without ever executing anything.
+func (l AppLauncher) Resolve(app string) (platform.Application, error) {
+	if l.adapter == nil {
+		return platform.Application{}, platform.ErrNotSupported
+	}
+	known, ok := platform.LookupApplication(app)
+	if !ok {
+		id := platform.CanonicalAppID(app)
+		return platform.Application{ID: id, Name: id}, nil
+	}
+	res := platform.Application{ID: known.ID, Name: known.Name, Known: true}
+	if bin, _, found := l.adapter.appLaunch(known.ID); found {
+		res.Executable = bin
+		res.Installed = true
+	}
+	return res, nil
+}
+
+// Launch opens the desktop application with its arguments. Only a resolved,
+// installed application is launched; an unknown id is never executed.
 func (l AppLauncher) Launch(app string, args ...string) error {
 	if l.adapter == nil {
 		return platform.ErrNotSupported
 	}
-	if bin, ok := l.adapter.appCommand(app); ok {
-		return launch(bin, args...)
+	known, ok := platform.LookupApplication(app)
+	if !ok {
+		return fmt.Errorf("application %q: %w", app, platform.ErrNotInstalled)
 	}
-	// Fall back to the XDG desktop entry launcher, which understands the
-	// application's registered name.
-	if _, err := exec.LookPath("gtk-launch"); err == nil {
-		return launch("gtk-launch", append([]string{app}, args...)...)
+	if bin, prefix, found := l.adapter.appLaunch(known.ID); found {
+		return launch(bin, append(append([]string{}, prefix...), args...)...)
+	}
+	// Fall back to the XDG desktop entry launcher. It takes no arguments, so it
+	// is only used when there is nothing to open.
+	if len(args) == 0 {
+		if _, err := exec.LookPath("gtk-launch"); err == nil {
+			return launch("gtk-launch", known.ID)
+		}
 	}
 	return fmt.Errorf("application %q: %w", app, platform.ErrNotInstalled)
-}
-
-// Available reports whether the named application appears to be installed.
-func (l AppLauncher) Available(app string) bool {
-	if l.adapter == nil {
-		return false
-	}
-	_, ok := l.adapter.appCommand(app)
-	return ok
 }
 
 // Supported implements platform.Capability.

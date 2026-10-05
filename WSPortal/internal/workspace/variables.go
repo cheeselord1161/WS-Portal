@@ -12,7 +12,7 @@ import (
 var varPattern = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}`)
 
 // Well-known portable variables. Values are resolved per machine, which is
-// what makes a single .ws file usable on Windows, macOS, and Linux.
+// what makes a single .ws file usable on Windows and Linux.
 const (
 	// VarWorkspaceRoot is the directory under which projects live.
 	VarWorkspaceRoot = "WORKSPACE_ROOT"

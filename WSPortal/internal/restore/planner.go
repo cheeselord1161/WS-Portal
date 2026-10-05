@@ -128,15 +128,20 @@ func (p *Planner) Plan(ws *workspace.Workspace) (*Plan, error) {
 	}
 
 	// --- Project ------------------------------------------------------------
-	label := resolved.Project.Name
-	if label == "" {
-		label = "project"
-	}
-	step := Step{Kind: StepProject, Label: label, ProjectPath: resolved.Project.Path}
-	if src := resolved.Project.Source; src != nil {
-		step.SourceType = src.Type
-		step.SourceURL = src.URL
-		step.SourceBranch = src.Branch
+	// The project block is optional, so a workspace without one must not crash
+	// the planner.
+	label := "project"
+	step := Step{Kind: StepProject, Label: label}
+	if resolved.Project != nil {
+		if resolved.Project.Name != "" {
+			step.Label = resolved.Project.Name
+		}
+		step.ProjectPath = resolved.Project.Path
+		if src := resolved.Project.Source; src != nil {
+			step.SourceType = src.Type
+			step.SourceURL = src.URL
+			step.SourceBranch = src.Branch
+		}
 	}
 	switch {
 	case step.ProjectPath != "" && pathExists(step.ProjectPath):
@@ -164,26 +169,77 @@ func (p *Planner) Plan(ws *workspace.Workspace) (*Plan, error) {
 	plan.Steps = append(plan.Steps, step)
 
 	// --- Applications -------------------------------------------------------
+	// Each application is resolved against the platform adapter's trusted
+	// mapping. A captured or imported id is never turned directly into a
+	// command; unknown applications are reported and skipped instead.
 	for _, app := range resolved.Applications {
+		name := app.LogicalName()
+		known, isKnown := platform.LookupApplication(name)
+		id := platform.CanonicalAppID(name)
+		label := id
+		if isKnown {
+			label = known.Name
+		}
+
+		// A terminal is an application, but WSPortal already has a dedicated
+		// terminal capability that knows how to open a shell in a directory on
+		// each platform. Route it there so the working directory is honored.
+		if id == "terminal" {
+			step := Step{
+				Kind:             StepTerminal,
+				Label:            label,
+				AppID:            id,
+				WorkingDirectory: app.WorkingDirectory,
+				Open:             append([]string(nil), app.Open...),
+			}
+			if step.WorkingDirectory == "" && len(app.Open) > 0 {
+				step.WorkingDirectory = app.Open[0]
+			}
+			if step.WorkingDirectory != "" {
+				step.Detail = step.WorkingDirectory
+			}
+			if p.Platform != nil && p.Platform.Terminals != nil && capabilitySupported(p.Platform.Terminals) {
+				step.Status = StatusReady
+			} else {
+				step.Status = StatusUnsupported
+				step.Reason = "no terminal emulator is available on this system"
+			}
+			plan.Steps = append(plan.Steps, step)
+			continue
+		}
+
 		step := Step{
 			Kind:             StepApplication,
-			Label:            app.Name,
+			Label:            label,
+			AppID:            id,
 			Open:             append([]string(nil), app.Open...),
 			WorkingDirectory: app.WorkingDirectory,
 		}
 		if len(app.Open) > 0 {
 			step.Detail = strings.Join(app.Open, ", ")
 		}
-		if p.Platform != nil && p.Platform.Apps != nil && capabilitySupported(p.Platform.Apps) {
-			if p.Platform.Apps.Available(app.Name) {
-				step.Status = StatusReady
-			} else {
-				step.Status = StatusMissing
-				step.Reason = fmt.Sprintf("application %q is not installed", app.Name)
-			}
-		} else {
+		if p.Platform == nil || p.Platform.Apps == nil || !capabilitySupported(p.Platform.Apps) {
 			step.Status = StatusUnsupported
 			step.Reason = "application launching is not available on this platform"
+			plan.Steps = append(plan.Steps, step)
+			continue
+		}
+		resolvedApp, err := p.Platform.Apps.Resolve(name)
+		switch {
+		case err != nil:
+			step.Status = StatusUnsupported
+			step.Reason = err.Error()
+		case !resolvedApp.Known:
+			step.Status = StatusMissing
+			step.Reason = fmt.Sprintf("unrecognized application %q", name)
+		case resolvedApp.Installed:
+			step.Status = StatusReady
+			if resolvedApp.Name != "" {
+				step.Label = resolvedApp.Name
+			}
+		default:
+			step.Status = StatusMissing
+			step.Reason = fmt.Sprintf("%s is not installed", resolvedApp.Name)
 		}
 		plan.Steps = append(plan.Steps, step)
 	}
@@ -393,13 +449,27 @@ func (p *Planner) executeProject(step Step, out io.Writer) error {
 }
 
 // executeApplication launches a desktop application through the platform
-// adapter, opening any paths the workspace recorded.
+// adapter, opening any paths the workspace recorded. A step that could not be
+// planned (the application is missing or unsupported) is reported and skipped
+// so the rest of the restore can continue.
 func (p *Planner) executeApplication(step Step, out io.Writer) error {
+	if step.Status == StatusMissing || step.Status == StatusUnsupported || step.Status == StatusSkipped {
+		fmt.Fprintf(out, "skipped: %s", step.Label)
+		if step.Reason != "" {
+			fmt.Fprintf(out, " (%s)", step.Reason)
+		}
+		fmt.Fprintln(out)
+		return nil
+	}
 	fmt.Fprintln(out, stepLine(step))
 	if p.Platform == nil || p.Platform.Apps == nil {
 		return fmt.Errorf("application launching is not implemented on this platform")
 	}
-	return p.Platform.Apps.Launch(step.Label, step.Open...)
+	app := step.AppID
+	if app == "" {
+		app = step.Label
+	}
+	return p.Platform.Apps.Launch(app, step.Open...)
 }
 
 // executeBrowser opens the browser with its configured tabs.

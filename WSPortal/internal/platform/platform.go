@@ -2,20 +2,44 @@
 //
 // The core of WSPortal never shells out to a platform-specific command
 // directly. Instead it depends on the small interfaces declared here, and a
-// per-OS adapter (see the windows, linux, and darwin subpackages) implements
-// them. This keeps the core portable and makes the platform layer mockable in
-// tests.
+// per-OS adapter (see the windows and linux subpackages) implements them. This
+// keeps the core portable and makes the platform layer mockable in tests.
 package platform
 
-// AppLauncher launches a desktop application by a logical name.
-type AppLauncher interface {
-	// Launch opens the named application, optionally passing args such as a
-	// file or folder to open. It returns ErrNotSupported when the adapter
-	// cannot launch the application.
-	Launch(app string, args ...string) error
+// Application is a logical application resolved against the current machine.
+//
+// The core never executes an arbitrary string from a workspace: a logical id is
+// resolved against a trusted, platform-specific mapping, and only a resolved
+// application can be launched.
+type Application struct {
+	// ID is the canonical, portable identifier, e.g. "vscode".
+	ID string
+	// Name is the human-friendly name, e.g. "VS Code", used in the restore plan.
+	Name string
+	// Executable is the local executable that provides the application, when
+	// it is installed. It is informational; callers must launch through the
+	// AppLauncher rather than executing it directly.
+	Executable string
+	// Known is true when the id maps to a catalogued application.
+	Known bool
+	// Installed is true when the application is installed on this machine.
+	Installed bool
+}
 
-	// Available reports whether the named application appears to be installed.
-	Available(app string) bool
+// AppLauncher resolves and launches desktop applications by logical id or name.
+type AppLauncher interface {
+	// Resolve maps a logical application id, alias, or display name to its
+	// local representation. An unrecognised reference resolves to an
+	// Application with Known=false rather than an error, so callers can report
+	// it clearly. It returns ErrNotSupported when the adapter cannot resolve
+	// applications at all.
+	Resolve(app string) (Application, error)
+
+	// Launch opens the named application, optionally passing args such as a
+	// file or folder to open. The reference is resolved first; an unknown or
+	// uninstalled application is never launched. It returns ErrNotSupported
+	// when the adapter cannot launch applications.
+	Launch(app string, args ...string) error
 
 	// Name is the logical name this launcher knows, e.g. "vscode". Used by the
 	// restore engine to match a workspace application to this launcher.

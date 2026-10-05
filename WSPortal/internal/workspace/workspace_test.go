@@ -45,7 +45,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	if got.Version != CurrentVersion {
 		t.Errorf("Version = %d, want %d", got.Version, CurrentVersion)
 	}
-	if len(got.Applications) != 1 || got.Applications[0].Name != "vscode" {
+	if len(got.Applications) != 1 || got.Applications[0].ID != "editor" || got.Applications[0].Name != "vscode" {
 		t.Errorf("Applications = %+v", got.Applications)
 	}
 	if len(got.Terminals) != 1 || got.Terminals[0].Command != "npm run dev" {
@@ -62,6 +62,90 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	}
 	if got.Environment.Runtime["node"] != "22" {
 		t.Errorf("Runtime[node] = %q, want %q", got.Environment.Runtime["node"], "22")
+	}
+}
+
+func TestLoadIDOnlyApplication(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "apps.ws")
+
+	// The portable form uses the logical id and no name.
+	doc := "version: 2\n" +
+		"workspace:\n  name: apps\n" +
+		"applications:\n" +
+		"  - id: vscode\n" +
+		"    open:\n" +
+		"      - ${WORKSPACE_ROOT}/myproject\n"
+	if err := os.WriteFile(path, []byte(doc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(got.Applications) != 1 {
+		t.Fatalf("Applications = %+v, want one", got.Applications)
+	}
+	app := got.Applications[0]
+	if app.ID != "vscode" || app.Name != "" {
+		t.Errorf("application = %+v, want id vscode and no name", app)
+	}
+	if app.LogicalName() != "vscode" {
+		t.Errorf("LogicalName() = %q, want vscode", app.LogicalName())
+	}
+	if want := "${WORKSPACE_ROOT}/myproject"; len(app.Open) != 1 || app.Open[0] != want {
+		t.Errorf("Open = %v, want [%s]", app.Open, want)
+	}
+
+	// Round-trip: the id and portable path must survive a save/load.
+	if err := Save(got, path); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	again, err := Load(path)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if len(again.Applications) != 1 || again.Applications[0].ID != "vscode" || again.Applications[0].Name != "" {
+		t.Errorf("round-tripped application = %+v", again.Applications)
+	}
+	if want := "${WORKSPACE_ROOT}/myproject"; again.Applications[0].Open[0] != want {
+		t.Errorf("round-tripped open = %q, want %q", again.Applications[0].Open[0], want)
+	}
+}
+
+func TestApplicationLogicalNamePrefersNameThenID(t *testing.T) {
+	cases := []struct {
+		app  Application
+		want string
+	}{
+		{Application{ID: "vscode"}, "vscode"},
+		{Application{ID: "editor", Name: "vscode"}, "vscode"},
+		{Application{ID: "editor", Name: "  vscode  "}, "vscode"},
+		{Application{ID: "terminal", Name: ""}, "terminal"},
+	}
+	for _, tc := range cases {
+		if got := tc.app.LogicalName(); got != tc.want {
+			t.Errorf("LogicalName(%+v) = %q, want %q", tc.app, got, tc.want)
+		}
+	}
+}
+
+func TestTabURLsDeduplicates(t *testing.T) {
+	session := BrowserSession{Windows: []BrowserWindow{
+		{Tabs: []BrowserTab{{URL: "https://a"}, {URL: "https://b"}}},
+		{Tabs: []BrowserTab{{URL: "https://a"}}},
+	}}
+	want := []string{"https://a", "https://b"}
+	got := session.TabURLs()
+	if len(got) != len(want) {
+		t.Fatalf("TabURLs = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("TabURLs = %v, want %v", got, want)
+			break
+		}
 	}
 }
 

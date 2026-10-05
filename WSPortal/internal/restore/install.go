@@ -88,12 +88,6 @@ type packageManager struct {
 // manager returns the package manager to use, or nil when none is available.
 func (i *Installer) manager() *packageManager {
 	switch i.GOOS {
-	case "darwin":
-		if _, ok := i.LookPath("brew"); ok {
-			return &packageManager{"brew", func(pkg string) []string {
-				return []string{"brew", "install", pkg}
-			}}
-		}
 	case "windows":
 		if _, ok := i.LookPath("winget"); ok {
 			return &packageManager{"winget", func(pkg string) []string {

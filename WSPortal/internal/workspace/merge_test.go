@@ -107,6 +107,34 @@ func TestMergePreservesCuratedContent(t *testing.T) {
 	}
 }
 
+func TestMergeApplicationsByLogicalIdentity(t *testing.T) {
+	// An existing workspace names VS Code explicitly; a fresh capture records
+	// only the portable id. They describe the same application and must merge.
+	existing := &Workspace{
+		Version:   CurrentVersion,
+		Workspace: Identity{Name: "x"},
+		Applications: []Application{
+			{ID: "editor", Name: "vscode", Open: []string{"${HOME}/a"}},
+		},
+	}
+	captured := &Workspace{
+		Version:      CurrentVersion,
+		Workspace:    Identity{Name: "x"},
+		Applications: []Application{{ID: "vscode", Open: []string{"${HOME}/b"}}},
+	}
+
+	got := Merge(existing, captured)
+	if len(got.Applications) != 1 {
+		t.Fatalf("Applications = %+v, want one merged entry", got.Applications)
+	}
+	if got.Applications[0].ID != "editor" {
+		t.Errorf("ID = %q, want the curated id editor preserved", got.Applications[0].ID)
+	}
+	if want := []string{"${HOME}/a", "${HOME}/b"}; !equalStrings(got.Applications[0].Open, want) {
+		t.Errorf("Open = %v, want %v", got.Applications[0].Open, want)
+	}
+}
+
 func TestMergeWithNil(t *testing.T) {
 	ws := New("x", "")
 	if got := Merge(nil, ws); got != ws {

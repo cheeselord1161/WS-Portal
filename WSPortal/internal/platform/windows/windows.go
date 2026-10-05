@@ -11,7 +11,9 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -63,14 +65,62 @@ func startShell(name string, args ...string) error {
 var appAliases = map[string]string{
 	"vscode":   "code",
 	"code":     "code",
+	"vscodium": "codium",
 	"codium":   "codium",
+	"cursor":   "cursor",
+	"intellij": "idea64",
+	"goland":   "goland64",
+	"pycharm":  "pycharm64",
+	"webstorm": "webstorm64",
+	"sublime":  "subl",
 	"notepad":  "notepad",
 	"explorer": "explorer",
 	"terminal": "wt",
 	"spotify":  "spotify",
 	"slack":    "slack",
 	"chrome":   "chrome",
+	"chromium": "chrome",
 	"firefox":  "firefox",
+	"edge":     "msedge",
+	"brave":    "brave",
+	"vivaldi":  "vivaldi",
+	"opera":    "opera",
+	"notion":   "notion",
+}
+
+// findExecutable locates a Windows executable by name. It checks PATH first,
+// then the usual per-user and machine-wide install roots, because applications
+// such as Chrome are resolved by ShellExecute (which `start` uses) rather than
+// being added to PATH.
+func findExecutable(bin string) (string, bool) {
+	if p, err := exec.LookPath(bin); err == nil {
+		return p, true
+	}
+	name := bin
+	if !strings.HasSuffix(strings.ToLower(name), ".exe") {
+		name += ".exe"
+	}
+	patterns := []string{
+		filepath.Join(name),
+		filepath.Join("*", name),
+		filepath.Join("*", "*", name),
+		filepath.Join("*", "*", "*", name),
+	}
+	for _, root := range []string{
+		os.Getenv("LOCALAPPDATA"),
+		os.Getenv("PROGRAMFILES"),
+		os.Getenv("PROGRAMFILES(X86)"),
+	} {
+		if strings.TrimSpace(root) == "" {
+			continue
+		}
+		for _, pattern := range patterns {
+			if matches, err := filepath.Glob(filepath.Join(root, pattern)); err == nil && len(matches) > 0 {
+				return matches[0], true
+			}
+		}
+	}
+	return "", false
 }
 
 // appCommand resolves the executable for a logical application name.
@@ -86,22 +136,38 @@ type AppLauncher struct {
 	adapter *Adapter
 }
 
-// Launch opens the named application with its arguments.
-func (l AppLauncher) Launch(app string, args ...string) error {
+// Resolve maps a logical application name to its Windows executable. An
+// unknown name resolves to a Known=false Application rather than an error.
+func (l AppLauncher) Resolve(app string) (platform.Application, error) {
 	if l.adapter == nil {
-		return platform.ErrNotSupported
+		return platform.Application{}, platform.ErrNotSupported
 	}
-	bin := appCommand(app)
-	if bin == "" {
-		return fmt.Errorf("application %q: %w", app, platform.ErrNotInstalled)
+	known, ok := platform.LookupApplication(app)
+	if !ok {
+		id := platform.CanonicalAppID(app)
+		return platform.Application{ID: id, Name: id}, nil
 	}
-	return startShell(bin, args...)
+	res := platform.Application{ID: known.ID, Name: known.Name, Known: true}
+	if bin := appCommand(known.ID); bin != "" {
+		if path, found := findExecutable(bin); found {
+			res.Executable = path
+			res.Installed = true
+		}
+	}
+	return res, nil
 }
 
-// Available reports whether the application executable is on PATH.
-func (AppLauncher) Available(app string) bool {
-	_, err := exec.LookPath(appCommand(app))
-	return err == nil
+// Launch opens the named application with its arguments. Only a resolved,
+// installed application is launched; an unknown id is never executed.
+func (l AppLauncher) Launch(app string, args ...string) error {
+	res, err := l.Resolve(app)
+	if err != nil {
+		return err
+	}
+	if !res.Known || !res.Installed {
+		return fmt.Errorf("application %q: %w", app, platform.ErrNotInstalled)
+	}
+	return startShell(res.Executable, args...)
 }
 
 // Supported implements platform.Capability.

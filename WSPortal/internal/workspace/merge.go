@@ -1,5 +1,7 @@
 package workspace
 
+import "github.com/cheeselord1161/WS_Portal/internal/platform"
+
 // Merge combines a freshly captured workspace with an existing one and returns
 // the result. It lets `ws capture` refresh a workspace without discarding
 // content the user added or curated by hand.
@@ -67,13 +69,17 @@ func mergeProject(existing, captured *Project) *Project {
 	return &out
 }
 
-// mergeApplications combines applications by ID (falling back to name), keeping
-// existing open paths and appending newly captured ones.
+// mergeApplications combines applications by their portable logical identity so
+// that the same application captured under a different name or id is not
+// duplicated. Existing open paths are kept and newly captured ones appended.
 func mergeApplications(existing, captured []Application) []Application {
 	out := make([]Application, 0, len(existing)+len(captured))
 	index := map[string]int{}
 	add := func(app Application) {
-		key := app.ID
+		key := platform.CanonicalAppID(app.LogicalName())
+		if key == "" {
+			key = app.ID
+		}
 		if key == "" {
 			key = app.Name
 		}

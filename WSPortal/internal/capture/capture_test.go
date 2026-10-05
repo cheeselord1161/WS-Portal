@@ -55,7 +55,7 @@ func TestProcessEngineCapturesEnvironment(t *testing.T) {
 		t.Errorf("Project.Path = %q, want %q", ws.Project.Path, want)
 	}
 
-	if len(ws.Applications) != 1 || ws.Applications[0].Name != "vscode" {
+	if len(ws.Applications) != 1 || ws.Applications[0].ID != "vscode" {
 		t.Fatalf("Applications = %+v, want one vscode", ws.Applications)
 	}
 	if want := "${HOME}/projects/myproject"; ws.Applications[0].Open[0] != want {
@@ -79,6 +79,45 @@ func TestProcessEngineCapturesEnvironment(t *testing.T) {
 
 	if len(ws.Environment.Tools) != 2 || ws.Environment.Tools[0] != "docker" || ws.Environment.Tools[1] != "git" {
 		t.Errorf("Tools = %v, want [docker git]", ws.Environment.Tools)
+	}
+}
+
+func TestProcessSourceDeduplicatesApplicationsAndSkipsHelpers(t *testing.T) {
+	lister := fakeLister{procs: []platform.Process{
+		{PID: 1, Name: "chrome"},
+		{PID: 2, Name: "chrome"},
+		{PID: 3, Name: "Google Chrome"},
+		{PID: 4, Name: "code", Cwd: "/work/app"},
+		{PID: 5, Name: "code-oss", Cwd: "/work/app"},
+		{PID: 6, Name: "code Helper (Renderer)"},
+		{PID: 7, Name: "chrome_crashpad_handler"},
+	}}
+
+	obs, err := ProcessSource{Processes: lister}.Observe()
+	if err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+
+	apps := map[string]int{}
+	browsers := map[string]int{}
+	for _, o := range obs {
+		switch o.Kind {
+		case KindApplication:
+			apps[o.Name]++
+		case KindBrowser:
+			browsers[o.Name]++
+		}
+	}
+	if len(apps) != 1 || apps["vscode"] != 1 {
+		t.Errorf("applications = %v, want exactly one vscode", apps)
+	}
+	if len(browsers) != 1 || browsers["chrome"] != 1 {
+		t.Errorf("browsers = %v, want exactly one chrome", browsers)
+	}
+	for name := range apps {
+		if strings.Contains(name, "helper") {
+			t.Errorf("helper process captured as application: %q", name)
+		}
 	}
 }
 

@@ -147,10 +147,20 @@ func (e *ProcessEngine) build(name string, observations []Observation) *workspac
 			if o.Name == "" {
 				continue
 			}
-			app, ok := apps[o.Name]
+			// Key applications by their portable id so different process names
+			// for one application (code, code-oss, Code.exe) dedupe to a single
+			// entry, and so the captured file is platform-neutral.
+			id := platform.CanonicalAppID(o.Name)
+			if id == "" {
+				continue
+			}
+			app, ok := apps[id]
 			if !ok {
-				app = &workspace.Application{ID: slug(o.Name), Name: o.Name}
-				apps[o.Name] = app
+				app = &workspace.Application{ID: id}
+				if _, known := platform.LookupApplication(o.Name); !known {
+					app.Name = o.Name
+				}
+				apps[id] = app
 			}
 			for _, value := range o.Values {
 				dir := e.portablePath(value)
@@ -335,22 +345,4 @@ func contains(list []string, value string) bool {
 		}
 	}
 	return false
-}
-
-// slug turns a display name into a stable identifier.
-func slug(name string) string {
-	var b strings.Builder
-	for _, r := range strings.ToLower(name) {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
-			b.WriteRune(r)
-		case r == ' ' || r == '-' || r == '_' || r == '.':
-			b.WriteRune('-')
-		}
-	}
-	out := strings.Trim(b.String(), "-")
-	if out == "" {
-		return "app"
-	}
-	return out
 }

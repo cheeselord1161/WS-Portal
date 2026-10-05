@@ -23,54 +23,94 @@ const (
 	KindProject = "project"
 )
 
-// appProcesses maps a process name to the logical application name WSPortal
-// uses in a workspace.
+// appProcesses maps a process name (already lowercased and stripped of any path
+// and .exe suffix) to the canonical logical application id. The map covers the
+// executable names used on Linux and Windows; helper processes are filtered
+// separately so subprocesses never become applications.
 var appProcesses = map[string]string{
-	"code":         "vscode",
-	"code-oss":     "vscode",
-	"codium":       "vscodium",
-	"idea":         "intellij",
-	"goland":       "goland",
-	"pycharm":      "pycharm",
-	"webstorm":     "webstorm",
-	"rustrover":    "rustrover",
-	"subl":         "sublime",
-	"sublime_text": "sublime",
-	"atom":         "atom",
-	"nvim":         "neovim",
-	"vim":          "vim",
-	"emacs":        "emacs",
-	"gimp":         "gimp",
-	"inkscape":     "inkscape",
-	"blender":      "blender",
-	"postman":      "postman",
-	"dbeaver":      "dbeaver",
-	"slack":        "slack",
-	"spotify":      "spotify",
+	"code":               "vscode",
+	"code-oss":           "vscode",
+	"visual studio code": "vscode",
+	"codium":             "vscodium",
+	"vscodium":           "vscodium",
+	"cursor":             "cursor",
+	"idea":               "intellij",
+	"idea64":             "intellij",
+	"intellij idea":      "intellij",
+	"goland":             "goland",
+	"goland64":           "goland",
+	"pycharm":            "pycharm",
+	"pycharm64":          "pycharm",
+	"webstorm":           "webstorm",
+	"phpstorm":           "phpstorm",
+	"clion":              "clion",
+	"rider":              "rider",
+	"datagrip":           "datagrip",
+	"rustrover":          "rustrover",
+	"fleet":              "fleet",
+	"subl":               "sublime",
+	"sublime_text":       "sublime",
+	"sublime text":       "sublime",
+	"atom":               "atom",
+	"nvim":               "neovim",
+	"vim":                "vim",
+	"emacs":              "emacs",
+	"gimp":               "gimp",
+	"inkscape":           "inkscape",
+	"blender":            "blender",
+	"postman":            "postman",
+	"dbeaver":            "dbeaver",
+	"slack":              "slack", "spotify": "spotify",
+	"notion": "notion",
 }
 
-// browserProcesses maps a process name to a browser name.
+// browserProcesses maps a process name to a browser name. Browsers are captured
+// through the specialized browser representation, not as generic applications,
+// because their tabs are meaningful workspace state.
 var browserProcesses = map[string]string{
 	"chrome":               "chrome",
 	"google-chrome":        "chrome",
 	"google-chrome-stable": "chrome",
+	"google chrome":        "chrome",
 	"chromium":             "chromium",
 	"chromium-browser":     "chromium",
 	"firefox":              "firefox",
 	"firefox-bin":          "firefox",
+	"mozilla firefox":      "firefox",
 	"brave":                "brave",
 	"brave-browser":        "brave",
 	"msedge":               "edge",
 	"microsoft-edge":       "edge",
+	"microsoft edge":       "edge",
 	"opera":                "opera",
 	"vivaldi":              "vivaldi",
-	"safari":               "safari",
 }
 
-// terminalProcesses lists interactive shells.
+// terminalProcesses lists interactive shells and terminal emulators. A terminal
+// is captured from the shell's working directory, so a terminal emulator that
+// exposes no directory contributes nothing.
 var terminalProcesses = map[string]bool{
 	"bash": true, "zsh": true, "fish": true, "sh": true, "dash": true,
 	"nu": true, "pwsh": true, "powershell": true, "cmd": true, "ksh": true,
+	"tmux": true,
+}
+
+// helperMarkers identify subprocesses, crash reporters, and telemetry helpers
+// that belong to an application but are not the application itself. Capturing
+// them would produce duplicate, meaningless entries.
+var helperMarkers = []string{
+	"helper", "crashpad", "crash reporter", "crashreporter", "telemetry",
+}
+
+// isHelperProcess reports whether a process name looks like a helper process
+// rather than a user-facing application.
+func isHelperProcess(name string) bool {
+	for _, marker := range helperMarkers {
+		if strings.Contains(name, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // serviceProcesses maps a process name to a service name.
@@ -122,6 +162,11 @@ func (s ProcessSource) Observe() ([]Observation, error) {
 
 	for _, p := range procs {
 		name := procName(p)
+		// Ignore unnamed processes and helper/subprocesses; only the
+		// application's main process should become an observation.
+		if name == "" || isHelperProcess(name) {
+			continue
+		}
 		cwd := strings.TrimSpace(p.Cwd)
 		if cwd != "" && !s.isNoiseDir(cwd) {
 			cwds = append(cwds, cwd)

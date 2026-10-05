@@ -51,14 +51,6 @@ func NewEditorSource(home string) Source {
 
 	var roots []editorRoot
 	switch runtime.GOOS {
-	case "darwin":
-		base := filepath.Join(home, "Library", "Application Support")
-		roots = append(roots,
-			editorRoot{"vscode", filepath.Join(base, "Code", "User"), layoutVSCode},
-			editorRoot{"vscodium", filepath.Join(base, "VSCodium", "User"), layoutVSCode},
-			editorRoot{"cursor", filepath.Join(base, "Cursor", "User"), layoutVSCode},
-			editorRoot{"", filepath.Join(base, "JetBrains"), layoutJetBrains},
-		)
 	case "windows":
 		base := os.Getenv("APPDATA")
 		if base == "" {

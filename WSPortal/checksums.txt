@@ -1,0 +1,4 @@
+3cd6caff2dc98931a8c3ec4e78dd741ea2ea2750cb5a6b97f8fa131a9ebb34b9  ws-linux-amd64
+49baa24baf8f613e8d360c00b632c2561410c582f2adb5e498cb88683c2a25e6  ws-linux-arm64
+ac45d37e50d7fc9cd65bfc701b7f9238077a2248afa7eb0cf6a43692bdc38d0a  ws-windows-amd64.exe
+90e67264edb6b683776d701cf82ce3289d27e891a3ca09d8aa7fd0dccec80b5c  ws-windows-arm64.exe

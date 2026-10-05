@@ -10,7 +10,6 @@ import (
 	"runtime"
 
 	"github.com/cheeselord1161/WS_Portal/internal/platform"
-	"github.com/cheeselord1161/WS_Portal/internal/platform/darwin"
 	"github.com/cheeselord1161/WS_Portal/internal/platform/linux"
 	"github.com/cheeselord1161/WS_Portal/internal/platform/windows"
 )
@@ -29,8 +28,6 @@ func For(goos string) *platform.Adapter {
 	switch goos {
 	case linux.OS:
 		return linux.New().Bundle()
-	case darwin.OS:
-		return darwin.New().Bundle()
 	case windows.OS:
 		return windows.New().Bundle()
 	default:
@@ -49,7 +46,7 @@ func For(goos string) *platform.Adapter {
 // Supported reports whether goos has a dedicated adapter.
 func Supported(goos string) bool {
 	switch goos {
-	case linux.OS, darwin.OS, windows.OS:
+	case linux.OS, windows.OS:
 		return true
 	default:
 		return false

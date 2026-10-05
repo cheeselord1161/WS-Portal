@@ -73,7 +73,15 @@ func (a *App) printWorkspace(path string, ws *workspace.Workspace) {
 	if len(ws.Applications) > 0 {
 		fmt.Fprintf(w, "\nApplications\n")
 		for _, app := range ws.Applications {
-			fmt.Fprintf(w, "  - %s (id: %s)\n", app.Name, app.ID)
+			label := app.Name
+			if label == "" {
+				label = app.ID
+			}
+			if app.ID != "" && app.ID != label {
+				fmt.Fprintf(w, "  - %s (id: %s)\n", label, app.ID)
+			} else {
+				fmt.Fprintf(w, "  - %s\n", label)
+			}
 			for _, o := range app.Open {
 				fmt.Fprintf(w, "      open: %s\n", o)
 			}

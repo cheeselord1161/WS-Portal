@@ -95,6 +95,24 @@ func (a *App) newResumeCommand() *cobra.Command {
 	return cmd
 }
 
+// stepMark renders the status glyph used in the restore plan. A missing
+// application or dependency is a warning (it does not stop the restore), so it
+// is drawn with the warning mark rather than a hard failure mark.
+func stepMark(status restore.StepStatus) string {
+	switch status {
+	case restore.StatusReady:
+		return "✓"
+	case restore.StatusMissing:
+		return "⚠"
+	case restore.StatusSkipped:
+		return "-"
+	case restore.StatusUnsupported:
+		return "~"
+	default:
+		return "?"
+	}
+}
+
 func (a *App) printPlan(plan *restore.Plan) {
 	w := a.Out
 
@@ -105,33 +123,46 @@ func (a *App) printPlan(plan *restore.Plan) {
 	fmt.Fprintf(w, "\nRestore plan:\n\n")
 
 	if len(plan.Steps) == 0 {
-		fmt.Fprintf(w, "  (nothing to restore)\n")
+		fmt.Fprintf(w, "\n  (nothing to restore)\n")
 	}
 
+	// Group the plan by category so it reads as a checklist rather than a
+	// flat dump. Steps are already in execution order within each category.
+	order := []restore.StepKind{
+		restore.StepProject, restore.StepApplication, restore.StepBrowser,
+		restore.StepTerminal, restore.StepService,
+	}
+	headers := map[restore.StepKind]string{
+		restore.StepProject:     "Project",
+		restore.StepApplication: "Applications",
+		restore.StepBrowser:     "Browser",
+		restore.StepTerminal:    "Terminals",
+		restore.StepService:     "Services",
+	}
+	grouped := make(map[restore.StepKind][]restore.Step)
 	for _, step := range plan.Steps {
-		mark := "?"
-		switch step.Status {
-		case restore.StatusReady:
-			mark = "✓"
-		case restore.StatusMissing:
-			mark = "✗"
-		case restore.StatusSkipped:
-			mark = "-"
-		case restore.StatusUnsupported:
-			mark = "~"
-		}
+		grouped[step.Kind] = append(grouped[step.Kind], step)
+	}
 
-		fmt.Fprintf(w, "  %s %s", mark, step.Label)
-		if step.Detail != "" {
-			fmt.Fprintf(w, " — %s", step.Detail)
+	for _, kind := range order {
+		steps := grouped[kind]
+		if len(steps) == 0 {
+			continue
 		}
-		if step.RequiresConfirmation {
-			fmt.Fprintf(w, " (requires confirmation)")
+		fmt.Fprintf(w, "\n%s:\n", headers[kind])
+		for _, step := range steps {
+			fmt.Fprintf(w, "  %s %s", stepMark(step.Status), step.Label)
+			if step.Detail != "" {
+				fmt.Fprintf(w, " — %s", step.Detail)
+			}
+			if step.RequiresConfirmation {
+				fmt.Fprintf(w, " (requires confirmation)")
+			}
+			if step.Reason != "" {
+				fmt.Fprintf(w, "\n      %s", step.Reason)
+			}
+			fmt.Fprintln(w)
 		}
-		if step.Reason != "" {
-			fmt.Fprintf(w, "\n      %s", step.Reason)
-		}
-		fmt.Fprintln(w)
 	}
 
 	if len(plan.Dependencies) > 0 {

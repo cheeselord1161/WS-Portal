@@ -5,11 +5,13 @@ package platform
 // implementations land.
 type UnsupportedApps struct{}
 
+// Resolve implements AppLauncher.
+func (UnsupportedApps) Resolve(string) (Application, error) {
+	return Application{}, ErrNotSupported
+}
+
 // Launch implements AppLauncher.
 func (UnsupportedApps) Launch(string, ...string) error { return ErrNotSupported }
-
-// Available implements AppLauncher.
-func (UnsupportedApps) Available(string) bool { return false }
 
 // Name implements AppLauncher.
 func (UnsupportedApps) Name() string { return "" }

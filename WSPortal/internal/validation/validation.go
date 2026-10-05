@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cheeselord1161/WS_Portal/internal/platform"
 	"github.com/cheeselord1161/WS_Portal/internal/workspace"
 )
 
@@ -152,10 +153,15 @@ func (v *Validator) Validate(ws *workspace.Workspace) Result {
 		} else {
 			seenAppID[app.ID] = true
 		}
-		if strings.TrimSpace(app.Name) == "" {
-			add(base+".name", "name is required", SeverityError)
-		} else if !v.applicationAllowed(app.Name) {
-			add(base+".name", fmt.Sprintf("unknown application %q", app.Name), SeverityWarning)
+		// The id is the portable identity; name is optional. The resolved
+		// reference (name when set, otherwise id) is checked against the
+		// trusted catalogue, or the injected allow-list, so an unknown
+		// application is visible without being fatal.
+		logical := app.LogicalName()
+		if strings.TrimSpace(logical) == "" {
+			add(base+".id", "an application id or name is required", SeverityError)
+		} else if !v.applicationAllowed(logical) {
+			add(base+".name", fmt.Sprintf("unknown application %q", logical), SeverityWarning)
 		}
 	}
 
@@ -236,15 +242,17 @@ func (v *Validator) Validate(ws *workspace.Workspace) Result {
 }
 
 func (v *Validator) applicationAllowed(name string) bool {
-	if len(v.KnownApplications) == 0 {
-		return true
-	}
-	for _, a := range v.KnownApplications {
-		if strings.EqualFold(a, name) {
-			return true
+	if len(v.KnownApplications) > 0 {
+		for _, a := range v.KnownApplications {
+			if strings.EqualFold(a, name) {
+				return true
+			}
 		}
+		return false
 	}
-	return false
+	// No explicit allow-list: accept anything the portable catalogue knows.
+	_, ok := platform.LookupApplication(name)
+	return ok
 }
 
 func (v *Validator) browserAllowed(name string) bool {

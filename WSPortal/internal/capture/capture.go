@@ -6,8 +6,8 @@
 // running, which local URLs are in play — never keystrokes, mouse movement, or
 // screen contents.
 //
-// The interfaces below define the shape of the engine. The default
-// implementation is a real process-inspection engine.
+// The interfaces below define the shape of the eventual engine. The default
+// implementation is a placeholder.
 package capture
 
 import (
@@ -68,4 +68,19 @@ type Engine interface {
 // ErrNotImplemented is returned by engines that cannot capture on this machine.
 var ErrNotImplemented = fmt.Errorf("automatic capture is not implemented yet")
 
+// Placeholder is an Engine that reports capture as unimplemented. It exists so
+// the `ws capture` command can be wired up now and made real later.
+type Placeholder struct {
+	// Sources are the observation sources the engine would consult.
+	Sources []Source
+}
 
+// NewPlaceholder returns a capture engine placeholder.
+func NewPlaceholder(sources ...Source) *Placeholder {
+	return &Placeholder{Sources: sources}
+}
+
+// Capture implements Engine.
+func (p *Placeholder) Capture(name string) (*workspace.Workspace, error) {
+	return nil, ErrNotImplemented
+}

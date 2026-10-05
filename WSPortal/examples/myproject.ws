@@ -13,13 +13,13 @@ project:
     url: https://github.com/user/myproject.git
     branch: main
   path: ${WORKSPACE_ROOT}/myproject
+# Applications are identified by a portable logical id; the platform adapter
+# maps it to the right executable or application bundle on each OS.
 applications:
-  - id: editor
-    name: vscode
+  - id: vscode
     open:
       - ${WORKSPACE_ROOT}/myproject
   - id: terminal
-    name: terminal
     working_directory: ${WORKSPACE_ROOT}/myproject
 browser:
   - browser: chrome

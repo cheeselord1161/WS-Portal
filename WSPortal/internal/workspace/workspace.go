@@ -6,6 +6,8 @@
 // human-readable, portable across operating systems, and safe to share.
 package workspace
 
+import "strings"
+
 // CurrentVersion is the schema version written by this build of WSPortal.
 // Bump it whenever the on-disk schema changes in a way that older builds
 // cannot understand. See version.go for migration hooks.
@@ -76,16 +78,34 @@ type Source struct {
 }
 
 // Application is a desktop application to launch as part of the environment.
+//
+// The portable identity is the logical ID (for example "vscode"); the platform
+// layer maps it to a local executable or application bundle. Name is an
+// optional, human-facing or platform-facing name kept for clarity and for
+// workspaces written before IDs were the primary identity.
 type Application struct {
-	// ID is a stable identifier used to refer to this application.
+	// ID is the portable logical identifier, for example "vscode" or
+	// "terminal". It is resolved by the platform adapter, never executed
+	// directly.
 	ID string `yaml:"id"`
-	// Name is the application name understood by the platform adapter,
-	// for example "vscode" or "terminal".
-	Name string `yaml:"name"`
+	// Name is an optional application name, kept for readability and for
+	// workspaces written before the id was the primary identity.
+	Name string `yaml:"name,omitempty"`
 	// Open lists files or folders to open in the application.
 	Open []string `yaml:"open,omitempty"`
 	// WorkingDirectory is the directory the application should start in.
 	WorkingDirectory string `yaml:"working_directory,omitempty"`
+}
+
+// LogicalName returns the reference the platform layer resolves for this
+// application. It prefers the optional name (the field older workspaces used to
+// identify the application) and falls back to the portable id, so both
+// `name: vscode` and `id: vscode` forms resolve to the same application.
+func (a Application) LogicalName() string {
+	if name := strings.TrimSpace(a.Name); name != "" {
+		return name
+	}
+	return strings.TrimSpace(a.ID)
 }
 
 // BrowserSession describes one browser instance and the tabs it should open.
@@ -139,20 +159,27 @@ func (b *BrowserSession) migrateLegacyTabs() {
 	}
 }
 
-// TabURLs returns every tab URL in window order, then any legacy flat tabs.
+// TabURLs returns every distinct tab URL in window order, then any legacy flat
+// tabs. Duplicates are dropped so that restoring opens each page once even when
+// a workspace was written by an older capture that recorded the same page more
+// than once.
 func (b BrowserSession) TabURLs() []string {
+	seen := map[string]bool{}
 	var out []string
+	add := func(u string) {
+		if u == "" || seen[u] {
+			return
+		}
+		seen[u] = true
+		out = append(out, u)
+	}
 	for _, w := range b.Windows {
 		for _, t := range w.Tabs {
-			if t.URL != "" {
-				out = append(out, t.URL)
-			}
+			add(t.URL)
 		}
 	}
 	for _, u := range b.Tabs {
-		if u != "" {
-			out = append(out, u)
-		}
+		add(u)
 	}
 	return out
 }
