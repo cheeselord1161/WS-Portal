@@ -4,7 +4,20 @@ All notable changes to WSPortal are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims
 to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## 0.1.1
+
+### Fixed
+
+* Fixed an issue where captured applications were not properly launched during workspace restoration.
+* Improved application launch handling during `ws resume`.
+* Improved restoration of supported applications such as VS Code and terminal applications.
+* Added safer handling for applications that are unavailable on the current system.
+
+### Platform Support
+
+* Official releases are currently available for Linux and Windows.
+* macOS support remains under development and is not included in official releases until it can be properly tested on real macOS hardware.
+
 
 ## [0.1.0] - 2026-10-04
 
