@@ -6,7 +6,7 @@ WSPortal makes your working environment portable. Describe the environment you
 work in once, then reconstruct it on another computer with a single command.
 
 > **Status: early development.** The CLI runs and restoration, capture, and
-> local-network transfer work on Linux, macOS, and Windows, but remote transfer
+> local-network transfer work on Linux and Windows, but remote transfer
 > is not implemented yet.
 
 ## Installation
@@ -20,10 +20,9 @@ release ships:
 | Platform | Architectures |
 | -------- | ------------- |
 | Linux    | amd64, arm64  |
-| macOS    | amd64, arm64  |
 | Windows  | amd64, arm64  |
 
-Archives are `tar.gz` on Linux and macOS and `zip` on Windows, and every
+Archives are `tar.gz` on Linux and `zip` on Windows, and every
 release includes a `checksums.txt`. Unpack the archive and put `ws` (or
 `ws.exe`) somewhere on your `PATH`.
 
@@ -159,7 +158,6 @@ Each machine defines `WORKSPACE_ROOT` for itself:
 | Platform | `WORKSPACE_ROOT`          |
 | -------- | ------------------------- |
 | Linux    | `/home/user/projects`     |
-| macOS    | `/Users/user/Projects`    |
 | Windows  | `D:\Projects`             |
 
 WSPortal resolves these variables at restore time. Set `WORKSPACE_ROOT` in your
@@ -244,7 +242,6 @@ internal/capture/     Capture engine: processes, editor workspaces, browser tabs
 internal/transfer/    Transfer interfaces, LAN sender/receiver, placeholders
 internal/platform/    OS capability interfaces and per-OS adapters
   ├── linux/
-  ├── darwin/
   ├── windows/
   └── detect/         Selects the adapter for the running OS
 ```
@@ -258,9 +255,9 @@ implement. Cross-platform tools such as `git` are the exception.
              Core WSPortal
                    │
       ┌────────────┼────────────┐
-      │            │            │
-   Windows       macOS        Linux
-   adapter      adapter      adapter
+      │                         │
+   Windows                    Linux
+   adapter                   adapter
 ```
 
 ## Development
@@ -287,7 +284,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Pushing the tag builds `ws` for Linux, macOS, and Windows (amd64 and arm64),
+Pushing the tag builds `ws` for Linux and Windows (amd64 and arm64),
 attaches the archives and a `checksums.txt` to a **draft** GitHub release, and
 injects the version into `ws version`. Review the draft, then publish it. The
 configuration lives in [`.goreleaser.yml`](.goreleaser.yml); run
