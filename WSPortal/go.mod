@@ -1,4 +1,4 @@
-module github.com/cheeselord1161/WS_Portal
+module github.com/cheeselord1161/WS-Portal
 
 go 1.24
 
