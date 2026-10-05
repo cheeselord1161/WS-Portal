@@ -32,7 +32,7 @@ declarative `.ws` file and rebuilds it on another machine.
   titles and window grouping). Re-capturing merges into an existing workspace;
   `--overwrite` replaces it.
 - LAN transfer (`ws send` / `ws receive`) with UDP discovery and a TCP handoff.
-- Platform adapters for Linux, macOS, and Windows behind small capability
+- Platform adapters for Linux and Windows behind small capability
   interfaces in `internal/platform`.
 
 ### Known limitations
