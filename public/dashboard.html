@@ -1,0 +1,1778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard — Forkd AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #000000;
+      --surface: #0a0a0a;
+      --surface2: #111111;
+      --surface3: #171717;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-hover: rgba(255, 255, 255, 0.15);
+      --accent: #ffffff;
+      --accent-dim: rgba(255, 255, 255, 0.1);
+      --text: #ededed;
+      --text-muted: #a1a1a1;
+      --text-dim: #525252;
+      --danger: #ff4545;
+      --success: #28c840;
+      --warning: #f59e0b;
+      --font-ui: 'Inter', sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+      --radius: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+    }
+
+    body.light-mode {
+      --bg: #ffffff; --surface: #f5f5f5; --surface2: #eeeeee; --surface3: #e5e5e5;
+      --border: rgba(0,0,0,0.08); --border-hover: rgba(0,0,0,0.15);
+      --accent: #000000; --accent-dim: rgba(0,0,0,0.1);
+      --text: #1a1a1a; --text-muted: #595959; --text-dim: #adadad;
+    }
+    body.no-animations, body.no-animations * { animation: none !important; transition: none !important; }
+
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-ui); min-height: 100vh; overflow-x: hidden; display: flex; }
+
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px), linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px);
+      background-size: 48px 48px; pointer-events: none; z-index: 0;
+    }
+
+    .glow-orb { position: fixed; border-radius: 50%; filter: blur(80px); pointer-events: none; z-index: 0; }
+    .glow-1 { width: 600px; height: 600px; background: rgba(255,255,255,0.03); top: -200px; left: -100px; }
+    .glow-2 { width: 400px; height: 400px; background: rgba(255,255,255,0.02); bottom: 20%; right: -100px; }
+
+    /* SIDEBAR */
+    .sidebar {
+      position: fixed; left: 0; top: 0; width: 240px; height: 100vh;
+      background: var(--surface); border-right: 1px solid var(--border);
+      padding: 1.5rem 0; z-index: 100; overflow-y: auto;
+      display: flex; flex-direction: column;
+    }
+    .sidebar-header {
+      padding: 0 1.25rem 1.5rem; display: flex; align-items: center;
+      gap: 10px; font-size: 1rem; font-weight: 800; letter-spacing: -0.03em;
+      text-decoration: none; color: var(--text);
+    }
+    @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.4; transform:scale(0.8); } }
+    .logo-img { height: 24px; width: auto; flex-shrink: 0; object-fit: contain; }
+    .sidebar-menu { flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 0 0.75rem; }
+    .menu-item {
+      display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+      border-radius: var(--radius-lg); cursor: pointer; transition: all 0.15s;
+      border: none; background: transparent; color: var(--text-muted);
+      font-size: 0.9rem; font-weight: 500; text-align: left; width: 100%; font-family: var(--font-ui);
+    }
+    .menu-item:hover { background: var(--surface2); color: var(--text); }
+    .menu-item.active { background: var(--accent-dim); color: var(--accent); font-weight: 600; border-left: 3px solid var(--accent); padding-left: calc(12px - 3px); }
+    .menu-icon { font-size: 1rem; width: 20px; text-align: center; }
+    .sidebar-footer { padding: 1.25rem 0.75rem; border-top: 1px solid var(--border); }
+    .logout-btn {
+      width: 100%; padding: 10px; border: none; background: rgba(255,69,69,0.1);
+      color: var(--danger); border-radius: var(--radius-lg); cursor: pointer;
+      font-weight: 600; font-size: 0.9rem; transition: all 0.15s; font-family: var(--font-ui);
+    }
+    .logout-btn:hover { background: rgba(255,69,69,0.15); }
+
+    /* MAIN */
+    .main-container { margin-left: 240px; flex: 1; position: relative; z-index: 1; }
+    .top-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 1.25rem 2rem; border-bottom: 1px solid var(--border);
+      background: rgba(10,12,12,0.5); backdrop-filter: blur(12px);
+      position: sticky; top: 0; z-index: 50;
+    }
+    .user-info { display: flex; align-items: center; gap: 12px; }
+    .user-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border); }
+    .user-details { display: flex; flex-direction: column; }
+    .user-name { font-weight: 600; font-size: 0.9rem; }
+    .user-email { font-size: 0.75rem; color: var(--text-muted); }
+    .content { padding: 2rem; min-height: calc(100vh - 73px); }
+    .section { display: none; }
+    .section.active { display: block; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+
+    /* CARDS */
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 1.75rem; position: relative; overflow: hidden; transition: all 0.2s; }
+    .card:hover { border-color: var(--border-hover); }
+    .card.featured { border-color: rgba(255,255,255,0.2); }
+    .card-label { display: inline-block; font-family: var(--font-mono); font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.75rem; background: var(--accent-dim); padding: 3px 8px; border-radius: 4px; }
+    .card-label.pro { color: var(--accent); }
+    .card-title { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 8px; }
+    .card-desc { font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.6; }
+    .card-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.25rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
+    .stat-item { display: flex; flex-direction: column; }
+    .stat-label { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dim); letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.35rem; }
+    .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+    .stat-sub { font-size: 0.7rem; color: var(--text-dim); margin-top: 2px; }
+    .card-actions { display: flex; flex-direction: column; gap: 0.6rem; }
+
+    /* USAGE BAR */
+    .usage-bar-wrap { margin-bottom: 1.25rem; }
+    .usage-bar-label { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem; font-family: var(--font-mono); }
+    .usage-bar-track { height: 6px; background: var(--surface3); border-radius: 3px; overflow: hidden; }
+    .usage-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.6s ease; }
+    .usage-bar-fill.warn { background: var(--warning); }
+    .usage-bar-fill.danger { background: var(--danger); }
+
+    /* RESET COUNTDOWN */
+    .reset-badge { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); background: var(--surface2); border: 1px solid var(--border); padding: 4px 10px; border-radius: 6px; margin-bottom: 1.25rem; }
+    .reset-badge span { color: var(--accent); }
+
+    /* HISTORY TABLE */
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .section-heading { font-size: 1rem; font-weight: 700; }
+    .search-bar { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; transition: border-color 0.15s; }
+    .search-bar:focus-within { border-color: var(--border-hover); }
+    .search-bar input { background: transparent; border: none; outline: none; color: var(--text); font-size: 0.85rem; width: 220px; }
+    .search-bar input::placeholder { color: var(--text-dim); }
+    .history-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; margin-bottom: 2rem; }
+    .history-table { width: 100%; border-collapse: collapse; }
+    .history-table th { font-family: var(--font-mono); font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; padding: 12px 16px; border-bottom: 1px solid var(--border); text-align: left; background: var(--surface2); }
+    .history-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 0.85rem; vertical-align: middle; }
+    .history-table tr:last-child td { border-bottom: none; }
+    .history-table tr:hover td { background: var(--surface2); }
+    .history-preview { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted); max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-version { font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent); font-weight: 600; }
+    .history-date { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim); }
+    .history-tag { display: inline-flex; font-family: var(--font-mono); font-size: 0.62rem; padding: 2px 7px; border-radius: 4px; background: var(--accent-dim); color: var(--text-muted); }
+    .history-actions { display: flex; gap: 6px; }
+    .btn-xs { font-size: 0.72rem; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.15s; font-family: var(--font-ui); white-space: nowrap; }
+    .btn-xs:hover { border-color: var(--border-hover); color: var(--text); background: var(--surface2); }
+    .empty-history { text-align: center; padding: 3rem 1rem; color: var(--text-dim); font-family: var(--font-mono); font-size: 0.85rem; }
+
+    /* ANALYTICS */
+    .analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .analytics-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 1.25rem; }
+    .analytics-label { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.5rem; }
+    .analytics-value { font-size: 1.8rem; font-weight: 800; color: var(--accent); }
+    .analytics-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+    .bar-chart { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 1.5rem; margin-bottom: 2rem; }
+    .bar-chart-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 1.25rem; color: var(--text-muted); font-family: var(--font-mono); }
+    .bar-chart-bars { display: flex; align-items: flex-end; gap: 8px; height: 100px; }
+    .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
+    .bar-fill { width: 100%; background: var(--accent-dim); border-radius: 3px 3px 0 0; transition: height 0.5s ease; min-height: 2px; border: 1px solid var(--border); }
+    .bar-label { font-family: var(--font-mono); font-size: 0.6rem; color: var(--text-dim); }
+    .commit-type-list { display: flex; flex-direction: column; gap: 0.6rem; }
+    .commit-type-row { display: flex; align-items: center; gap: 10px; }
+    .commit-type-name { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted); width: 90px; }
+    .commit-type-track { flex: 1; height: 6px; background: var(--surface3); border-radius: 3px; overflow: hidden; }
+    .commit-type-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.6s ease; }
+    .commit-type-count { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dim); width: 30px; text-align: right; }
+
+    /* SETTINGS */
+    .settings-group { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 1.5rem; margin-bottom: 1.5rem; }
+    .settings-title { font-size: 1rem; font-weight: 700; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; }
+    .settings-item { display: flex; justify-content: space-between; align-items: center; padding: 0.875rem 0; border-bottom: 1px solid var(--border); }
+    .settings-item:last-child { border-bottom: none; }
+    .settings-label { display: flex; flex-direction: column; }
+    .settings-label-title { font-weight: 600; margin-bottom: 0.2rem; font-size: 0.9rem; }
+    .settings-label-desc { font-size: 0.8rem; color: var(--text-muted); }
+    .toggle { width: 48px; height: 26px; background: var(--surface2); border: 1px solid var(--border); border-radius: 13px; cursor: pointer; position: relative; transition: all 0.2s; flex-shrink: 0; }
+    .toggle.active { background: var(--accent); }
+    .toggle-thumb { width: 22px; height: 22px; background: var(--text-dim); border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: left 0.2s; }
+    .toggle.active .toggle-thumb { left: 24px; background: var(--bg); }
+
+    /* BUTTONS */
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0.65rem 1.1rem; border-radius: var(--radius-lg); font-family: var(--font-ui); font-weight: 600; font-size: 0.875rem; text-decoration: none; border: none; cursor: pointer; transition: all 0.15s; }
+    .btn-primary { background: var(--accent); color: var(--bg); }
+    .btn-primary:hover { background: var(--text-muted); transform: translateY(-1px); }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border-hover); }
+    .btn-secondary:hover { border-color: var(--text-dim); background: var(--surface3); }
+    .btn-danger { background: rgba(255,69,69,0.1); color: var(--danger); border: 1px solid rgba(255,69,69,0.2); }
+    .btn-danger:hover { background: rgba(255,69,69,0.18); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+    /* MODAL */
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 2000; align-items: center; justify-content: center; padding: 2rem; }
+    .modal.active { display: flex; }
+    .modal-content { background: var(--surface); border: 1px solid var(--border-hover); border-radius: var(--radius-xl); padding: 2.25rem; max-width: 480px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+    .modal-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--text); }
+    .modal-desc { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.75rem; line-height: 1.6; }
+    .modal-actions { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .modal-actions button { flex: 1; min-width: 100px; }
+
+    /* HISTORY DETAIL MODAL */
+    .history-modal-pre { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; font-family: var(--font-mono); font-size: 0.78rem; line-height: 1.7; color: var(--text-muted); max-height: 320px; overflow-y: auto; white-space: pre-wrap; margin-bottom: 1.5rem; }
+
+    /* ALERTS */
+    .alert { padding: 0.875rem 1rem; border-radius: var(--radius-lg); margin-bottom: 1.25rem; font-size: 0.875rem; }
+    .alert-success { background: rgba(40,200,64,0.1); border: 1px solid rgba(40,200,64,0.2); color: var(--success); }
+    .alert-error { background: rgba(255,69,69,0.1); border: 1px solid rgba(255,69,69,0.2); color: var(--danger); }
+
+    /* PLAN BADGE */
+    .plan-badge { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 0.7rem; padding: 3px 9px; border-radius: 4px; font-weight: 700; background: var(--accent-dim); color: var(--accent); letter-spacing: 0.05em; }
+    .plan-badge.pro { background: rgba(255,255,255,0.15); color: #fff; }
+
+    /* CANCEL NOTICE */
+    .cancel-notice-box { margin-bottom: 1.25rem; padding: 0.875rem 1rem; background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); border-radius: var(--radius-lg); font-size: 0.85rem; color: var(--text-muted); }
+
+    /* RESPONSIVE */
+    @media(max-width: 768px) {
+      .sidebar { width: 0; overflow: hidden; }
+      .main-container { margin-left: 0; }
+      .content { padding: 1rem; }
+      .cards-grid { grid-template-columns: 1fr; }
+      .search-bar input { width: 140px; }
+    }
+
+    .hidden { display: none !important; }
+    .reveal { animation: fadeUp 0.6s ease both; }
+    .loading-shimmer { pointer-events: none; opacity: 0.5; }
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
+  </style>
+<link rel="stylesheet" href="/forkd-theme.css">
+</head>
+<body>
+  <div class="glow-orb glow-1"></div>
+  <div class="glow-orb glow-2"></div>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <a class="sidebar-header" href="/" aria-label="Forkd home">
+      <img src="logo.png" alt="Forkd logo" class="logo-img">Forkd
+    </a>
+    <div class="sidebar-menu">
+      <button class="menu-item active" onclick="showSection('home', this)">
+        <span class="menu-icon"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span><span>Home</span>
+      </button>
+      <button class="menu-item" onclick="showSection('history', this)">
+        <span class="menu-icon"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="15" x2="15" y2="15"/></svg></span><span>History</span>
+      </button>
+      <button class="menu-item" onclick="showSection('analytics', this)">
+        <span class="menu-icon"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.5" fill="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="14" width="3" height="8"/><rect x="7" y="9" width="3" height="13"/><rect x="12" y="4" width="3" height="18"/><rect x="17" y="11" width="3" height="11"/></svg></span><span>Analytics</span>
+      </button>
+      <button class="menu-item" onclick="showSection('account', this)">
+        <span class="menu-icon"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span><span>Account</span>
+      </button>
+      <button class="menu-item" onclick="showSection('settings', this)">
+        <span class="menu-icon"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v3m0 16v3M23 12h-3m-16 0H1"/><line x1="20.485" y1="3.515" x2="18.364" y2="5.636"/><line x1="5.636" y1="18.364" x2="3.515" y2="20.485"/><line x1="20.485" y1="20.485" x2="18.364" y2="18.364"/><line x1="5.636" y1="5.636" x2="3.515" y2="3.515"/></svg></span><span>Settings</span>
+      </button>
+      <button class="menu-item" onclick="showSection('billing', this)">
+        <span class="menu-icon"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span><span>Billing</span>
+      </button>
+      <button class="menu-item" onclick="showSection('shared', this)">
+        <span class="menu-icon"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></span><span>Shared</span>
+      </button>
+      <button class="menu-item" onclick="showSection('following', this)">
+        <span class="menu-icon"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg></span><span>Following</span>
+      </button>
+      <button class="menu-item" onclick="showSection('branding', this)">
+        <span class="menu-icon"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 0-2 19.7V22h4v-.3A10 10 0 0 0 12 2z"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span><span>Branding</span><span class="badge" style="font-size:0.5rem;padding:1px 5px;margin-left:4px;background:var(--accent-dim);color:var(--accent);border-radius:3px;font-family:var(--font-mono);">PRO</span>
+      </button>
+      <button class="menu-item" onclick="showSection('api-access', this)">
+        <span class="menu-icon"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg></span><span>API</span><span class="badge" style="font-size:0.5rem;padding:1px 5px;margin-left:4px;background:var(--accent-dim);color:var(--accent);border-radius:3px;font-family:var(--font-mono);">PRO</span>
+      </button>
+    </div>
+    <div class="sidebar-footer">
+      <a class="menu-item" href="/discover" style="text-decoration:none;margin-bottom:4px;">↗ <span>Explore Forkd</span></a>
+      <a class="menu-item" href="/changelog_generator.html" style="text-decoration:none;margin-bottom:8px;">✦ <span>Open generator</span></a>
+      <button class="logout-btn" onclick="window.logoutUser()">Sign Out</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main-container">
+    <div class="top-bar">
+      <div>
+        <h1 class="page-title" id="section-title" style="font-size:1.4rem;font-weight:800;letter-spacing:-0.03em;"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:8px;vertical-align:-2px;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Dashboard</h1>
+      </div>
+      <div class="user-info">
+        <img id="user-avatar" src="" alt="Avatar" class="user-avatar" style="display:none;">
+        <div class="user-details">
+          <div class="user-name" id="user-name">Loading...</div>
+          <div class="user-email" id="user-email">user@example.com</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+      <div id="alert-container"></div>
+
+      <!-- ── HOME ── -->
+      <div id="home" class="section active">
+        <div class="cards-grid">
+
+          <!-- Subscription Card -->
+          <div class="card featured reveal">
+            <div class="card-label pro" id="plan-badge-label">FREE PLAN</div>
+            <div class="card-title"><span style="font-size:1.4rem;"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span id="sub-plan">Free</span></div>
+            <p class="card-desc" id="sub-desc">Perfect for solo developers and side projects.</p>
+
+            <div class="usage-bar-wrap">
+              <div class="usage-bar-label">
+                <span>Today's usage</span>
+                <span id="usage-fraction">0 / 25</span>
+              </div>
+              <div class="usage-bar-track">
+                <div class="usage-bar-fill" id="usage-bar" style="width:0%"></div>
+              </div>
+            </div>
+
+            <div class="reset-badge">
+              <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:4px;vertical-align:-1px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>Resets in <span id="reset-countdown">—</span>
+            </div>
+
+            <div id="cancel-notice" class="cancel-notice-box hidden">
+              <strong style="color:var(--text);">Subscription ends on</strong><br/>
+              <span id="end-date-display" style="color:var(--warning);font-weight:700;"></span>
+            </div>
+
+            <div class="card-actions">
+              <a href="changelog_generator.html" class="btn btn-primary">Open Generator <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-left:6px;vertical-align:-1px;"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+              <a id="upgrade-btn" href="#" class="btn btn-secondary hidden"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" style="display:inline;margin-right:4px;vertical-align:-1px;"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8Z"/></svg>Upgrade to Pro</a>
+              <a href="https://marketplace.visualstudio.com/items?itemName=forkd.forkd-ai"
+                target="_blank" 
+                rel="noopener noreferrer" 
+                class="btn btn-primary">
+               Install VS Code Extension 
+              </a>
+              <button id="cancel-btn" class="btn btn-danger hidden">Cancel Subscription</button>
+            </div>
+          </div>
+
+          <!-- Account Card -->
+          <div class="card reveal">
+            <div class="card-label">ACCOUNT</div>
+            <div class="card-title"><span style="font-size:1.4rem;"><svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> Account</div>
+            <p class="card-desc">Your account activity at a glance.</p>
+            <div class="card-stats">
+              <div class="stat-item">
+                <span class="stat-label">Total Generated</span>
+                <span class="stat-value" id="total-gens">0</span>
+                <span class="stat-sub">all time</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Member Since</span>
+                <span class="stat-value" id="member-since" style="font-size:1rem;">—</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Shared Views</span>
+                <span class="stat-value" id="shared-views">0</span>
+                <span class="stat-sub">from public links</span>
+              </div>
+            </div>
+            <div class="card-actions">
+              <button class="btn btn-secondary" onclick="showSection('history', document.querySelector('[onclick*=history]'))">View History <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-left:6px;vertical-align:-1px;"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+              <a href="index.html" class="btn btn-secondary" style="border:none;color:var(--text-dim);font-size:0.8rem;">← Back to Home</a>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 7-day mini chart -->
+        <div class="bar-chart reveal">
+          <div class="bar-chart-title">// generations this week</div>
+          <div class="bar-chart-bars" id="week-chart"></div>
+        </div>
+      </div>
+
+      <!-- ── HISTORY ── -->
+      <div id="history" class="section">
+        <div class="section-header" style="margin-bottom:1.25rem;">
+          <div class="section-heading"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:8px;vertical-align:-2px;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="15" x2="15" y2="15"/></svg>Changelog History</div>
+          <div class="search-bar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="history-search" placeholder="Search changelogs…" oninput="filterHistory()">
+          </div>
+        </div>
+        <div class="history-table-wrap">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Version</th>
+                <th>Preview</th>
+                <th>Date</th>
+                <th>Source</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="history-tbody">
+              <tr><td colspan="5"><div class="empty-history">No history yet. Generate your first changelog!</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:0.78rem;color:var(--text-dim);font-family:var(--font-mono);">History is saved locally in your browser. <span id="history-limit-note"></span></p>
+      </div>
+
+      <!-- ── ANALYTICS ── -->
+      <div id="analytics" class="section">
+        <div class="analytics-grid" id="analytics-cards">
+          <div class="analytics-card">
+            <div class="analytics-label">Total Generated</div>
+            <div class="analytics-value" id="a-total">0</div>
+            <div class="analytics-sub">all time</div>
+          </div>
+          <div class="analytics-card">
+            <div class="analytics-label">This Week</div>
+            <div class="analytics-value" id="a-week">0</div>
+            <div class="analytics-sub">past 7 days</div>
+          </div>
+          <div class="analytics-card">
+            <div class="analytics-label">Avg / Day</div>
+            <div class="analytics-value" id="a-avg">0</div>
+            <div class="analytics-sub">past 7 days</div>
+          </div>
+          <div class="analytics-card">
+            <div class="analytics-label">Most Active</div>
+            <div class="analytics-value" id="a-peak" style="font-size:1.1rem;">—</div>
+            <div class="analytics-sub">peak day</div>
+          </div>
+        </div>
+
+        <div class="bar-chart">
+          <div class="bar-chart-title">// commit types breakdown (from history)</div>
+          <div class="commit-type-list" id="commit-type-chart">
+            <div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-dim);">Generate some changelogs to see analytics.</div>
+          </div>
+        </div>
+
+        <div class="bar-chart">
+          <div class="bar-chart-title">// daily generations (last 14 days)</div>
+          <div class="bar-chart-bars" id="analytics-chart" style="height:120px;"></div>
+        </div>
+      </div>
+
+      <!-- ── ACCOUNT ── -->
+      <div id="account" class="section">
+        <div class="settings-group">
+          <div class="settings-title"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:8px;vertical-align:-2px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Profile Information</div>
+          <div class="settings-item">
+            <div class="settings-label">
+              <div class="settings-label-title">Email</div>
+              <div class="settings-label-desc" id="account-email">—</div>
+            </div>
+          </div>            <div class="settings-item">
+              <div class="settings-label">
+                <div class="settings-label-title">Display Name</div>
+                <div class="settings-label-desc" id="account-displayname">—</div>
+              </div>
+            </div>
+            <div class="settings-item">
+              <div class="settings-label">
+                <div class="settings-label-title">Bio</div>
+                <div class="settings-label-desc">Appears on your public profile page</div>
+              </div>
+              <textarea id="account-bio-input" maxlength="160" placeholder="Write a short bio…" style="width:220px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-family:var(--font-mono);font-size:0.78rem;color:var(--text);outline:none;resize:none;height:48px;"></textarea>
+            </div>
+            <div class="settings-item">
+              <div class="settings-label">
+                <div class="settings-label-title">Account Created</div>
+                <div class="settings-label-desc" id="account-created">—</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:0.75rem;margin-top:0.5rem;">
+              <button id="save-profile-btn" class="btn btn-primary" style="width:auto;">Save Profile</button>
+              <span id="profile-status" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--success);display:none;align-items:center;gap:6px;">✓ Saved</span>
+            </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-title"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:8px;vertical-align:-2px;"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/></svg>Connected Providers</div>
+          <div id="connected-providers-list">
+            <div style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text-dim);padding:1rem;text-align:center;">Loading providers…</div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-title"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:8px;vertical-align:-2px;"><path d="M12 5v14M5 12h14"/></svg>Add Provider</div>
+          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+            <button class="btn btn-secondary" id="link-google-btn" onclick="linkProvider('google')" style="gap:8px;display:none;">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>Link Google
+            </button>
+            <button class="btn btn-secondary" id="link-github-btn" onclick="linkProvider('github')" style="gap:8px;display:none;">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>Link GitHub
+            </button>
+          </div>
+          <p style="font-size:0.78rem;color:var(--text-dim);margin-top:1rem;font-family:var(--font-mono);">Link multiple sign-in methods to your account. You'll be able to sign in with any linked provider using your email.</p>
+        </div>
+
+        <div id="account-alerts"></div>
+      </div>
+
+      <!-- ── SETTINGS ── -->
+      <div id="settings" class="section">
+        <div class="settings-group">
+          <div class="settings-title"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:8px;vertical-align:-2px;"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Appearance</div>
+          <div class="settings-item">
+            <div class="settings-label">
+              <div class="settings-label-title">Dark Mode</div>
+              <div class="settings-label-desc">Use dark background (recommended)</div>
+            </div>
+            <div class="toggle active" id="toggle-dark"><div class="toggle-thumb"></div></div>
+          </div>
+          <div class="settings-item">
+            <div class="settings-label">
+              <div class="settings-label-title">Animations</div>
+              <div class="settings-label-desc">Enable UI transitions and effects</div>
+            </div>
+            <div class="toggle active" id="toggle-anim"><div class="toggle-thumb"></div></div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-title"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:8px;vertical-align:-2px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M16 2v4M8 2v4M2 10h20"/></svg>Communication</div>
+          <div class="settings-item">
+            <div class="settings-label">
+              <div class="settings-label-title">Release Notifications</div>
+              <div class="settings-label-desc">Email me when projects I follow publish a release. Email delivery is not enabled yet — this preference is saved to your account.</div>
+            </div>
+            <div class="toggle active" id="toggle-email"><div class="toggle-thumb"></div></div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-title"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:8px;vertical-align:-2px;"><polyline points="3 6 5 4 7 6"/><line x1="6" y1="4" x2="6" y2="12"/><polyline points="21 18 19 20 17 18"/><line x1="18" y1="20" x2="18" y2="12"/><path d="M1 12a5 5 0 0 0 10 0"/><path d="M13 12a5 5 0 0 0 10 0"/></svg>Data</div>
+          <div class="settings-item">
+            <div class="settings-label">
+              <div class="settings-label-title">Clear Local History</div>
+              <div class="settings-label-desc">Remove all saved changelogs from this browser</div>
+            </div>
+            <button class="btn btn-danger" style="width:auto;padding:8px 16px;" onclick="clearHistory()">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SHARED ── -->
+      <div id="shared" class="section">
+        <div class="section-header" style="margin-bottom:1.25rem;">
+          <div class="section-heading"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:8px;vertical-align:-2px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>Shared Changelogs</div>
+          <span style="font-size:0.8rem;color:var(--text-dim);font-family:var(--font-mono);">Public links you've shared</span>
+        </div>
+        <div class="history-table-wrap">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Version</th>
+                <th>Views</th>
+                <th>Shared</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="shared-tbody">
+              <tr><td colspan="5"><div class="empty-history">No shared changelogs yet. Generate a changelog and click "Share ↗" to create one!</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      
+      <!-- ── YOUR FEED ── -->
+      <div id="feed" class="section">
+        <div class="settings-group">
+          <div class="settings-title">Your feed</div>
+          <div class="settings-label-desc" style="margin-bottom:1rem;">Changelogs from the people and organizations you follow.</div>
+          <div id="personal-feed"><div class="spinner"></div></div>
+        </div>
+        <div class="settings-group">
+          <div class="settings-title">Your organizations</div>
+          <div id="my-orgs"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- ── FOLLOWING ── -->
+      <div id="following" class="section" style="display:none;">
+        <div class="settings-group">
+          <div class="settings-title">Projects you follow</div>
+          <div id="followed-projects-list"><div class="spinner"></div></div>
+        </div>
+        <div class="settings-group">
+          <div class="settings-title">Latest releases from followed projects</div>
+          <div id="followed-projects-feed"><div class="spinner"></div></div>
+        </div>
+        <div class="section-header">
+          <div class="settings-title"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-3px;margin-right:8px;"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>Following</div>
+          <div class="settings-label-desc" style="margin-top:0;">Changelogs from people you follow</div>
+        </div>
+        <div class="history-table-wrap">
+          <table class="history-table">
+            <thead><tr><th>Title</th><th>Author</th><th>Stars</th><th>Views</th><th>Shared</th><th></th></tr></thead>
+            <tbody id="following-tbody"><tr><td colspan="6"><div class="empty-history">No changelogs from followed users yet. <a href="/discover" style="color:var(--accent);text-decoration:underline;">Discover people to follow →</a></div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── BILLING ── -->
+      <div id="billing" class="section">
+        <div class="settings-group">
+          <div class="settings-title"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:8px;vertical-align:-2px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Current Plan</div>
+          <div class="settings-item">
+            <div class="settings-label">
+              <div class="settings-label-title" id="billing-plan">Free Plan</div>
+              <div class="settings-label-desc" id="billing-plan-desc">$0 / month · 25 changelogs per day</div>
+            </div>
+            <a id="billing-upgrade-btn" href="#" class="btn btn-primary hidden" style="width:auto;">Upgrade to Pro <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-left:6px;vertical-align:-1px;"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+          </div>
+        </div>
+        <div class="settings-group">
+          <div class="settings-title"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:8px;vertical-align:-2px;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="15" x2="15" y2="15"/></svg>Usage Reset</div>
+          <div class="settings-item">
+            <div class="settings-label">
+              <div class="settings-label-title">Daily limit resets at midnight UTC</div>
+              <div class="settings-label-desc">Time until reset: <span id="billing-reset" style="color:var(--accent);font-family:var(--font-mono);">—</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="settings-group">
+          <div class="settings-title"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:8px;vertical-align:-2px;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="15" x2="15" y2="15"/></svg>Billing History</div>
+          <div class="settings-item">
+            <div class="settings-label">
+              <div class="settings-label-title">No billing history yet</div>
+              <div class="settings-label-desc">Your invoices will appear here after your first payment</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── BRANDING (Pro) ── -->
+      <div id="branding" class="section">
+        <div class="settings-group">
+          <div class="settings-title"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:8px;vertical-align:-2px;"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 0-2 19.7V22h4v-.3A10 10 0 0 0 12 2z"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Custom Branding <span class="badge" style="font-size:0.6rem;padding:2px 8px;margin-left:4px;background:var(--accent-dim);color:var(--accent);border-radius:4px;font-family:var(--font-mono);">PRO</span></div>
+          <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1.25rem;line-height:1.6;font-family:var(--font-mono);">Customize how your shared changelogs appear. Only visible on shared pages you create.</p>
+          <div class="settings-item">
+            <div class="settings-label">
+              <div class="settings-label-title">Brand Name</div>
+              <div class="settings-label-desc">Displayed instead of Forkd on shared pages</div>
+            </div>
+            <input id="brand-name-input" type="text" placeholder="Your Brand" style="width:160px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-family:var(--font-mono);font-size:0.8rem;color:var(--text);outline:none;" maxlength="40"/>
+          </div>
+          <div class="settings-item">
+            <div class="settings-label">
+              <div class="settings-label-title">Accent Color</div>
+              <div class="settings-label-desc">Used for headings and buttons on your shared page</div>
+            </div>
+            <input id="brand-accent-input" type="color" value="#ffffff" style="width:48px;height:36px;border:1px solid var(--border);border-radius:6px;background:transparent;cursor:pointer;"/>
+          </div>
+          <div class="settings-item">
+            <div class="settings-label">
+              <div class="settings-label-title">Background Color</div>
+              <div class="settings-label-desc">Page background for your shared changelogs</div>
+            </div>
+            <input id="brand-bg-input" type="color" value="#030305" style="width:48px;height:36px;border:1px solid var(--border);border-radius:6px;background:transparent;cursor:pointer;"/>
+          </div>
+          <div class="settings-item">
+            <div class="settings-label">
+              <div class="settings-label-title">Logo URL</div>
+              <div class="settings-label-desc">Direct link to a logo image (PNG/SVG). Shows at top of shared pages.</div>
+            </div>
+            <input id="brand-logo-input" type="text" placeholder="https://example.com/logo.png" style="width:200px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-family:var(--font-mono);font-size:0.8rem;color:var(--text);outline:none;"/>
+          </div>
+          <div class="settings-item">
+            <div class="settings-label">
+              <div class="settings-label-title">Hide 'Powered by Forkd'</div>
+              <div class="settings-label-desc">Removes the Forkd attribution badge from your shared pages</div>
+            </div>
+            <div class="toggle" id="toggle-hide-branding"><div class="toggle-thumb"></div></div>
+          </div>
+          <div style="display:flex;gap:0.75rem;margin-top:1rem;">
+            <button id="save-branding-btn" class="btn btn-primary">Save Branding</button>
+            <span id="branding-status" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--success);display:none;align-items:center;gap:6px;">✓ Saved</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── API ACCESS (Pro) ── -->
+      <div id="api-access" class="section">
+        <div class="settings-group">
+          <div class="settings-title"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:8px;vertical-align:-2px;"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>API Access <span class="badge" style="font-size:0.6rem;padding:2px 8px;margin-left:4px;background:var(--accent-dim);color:var(--accent);border-radius:4px;font-family:var(--font-mono);">PRO</span></div>
+          <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1.25rem;line-height:1.6;font-family:var(--font-mono);">Generate changelogs programmatically using your personal API key. Use in CI/CD pipelines, scripts, or integrations.</p>
+          <div class="settings-item">
+            <div class="settings-label">
+              <div class="settings-label-title">Your API Key</div>
+              <div class="settings-label-desc" id="api-key-desc">Generate a key to use with the <code style="background:var(--surface2);padding:2px 4px;border-radius:3px;font-size:0.75rem;">/api/generate</code> endpoint</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <code id="api-key-display" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--accent);background:var(--surface2);border:1px solid var(--border);padding:8px 12px;border-radius:6px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:none;"></code>
+              <button id="copy-api-key-btn" class="btn btn-sm btn-ghost" style="display:none;" onclick="copyApiKey()">Copy</button>
+              <button id="generate-api-key-btn" class="btn btn-sm btn-primary">Generate Key</button>
+              <button id="revoke-api-key-btn" class="btn btn-sm btn-danger" style="display:none;">Revoke</button>
+            </div>
+          </div>
+          <div class="settings-item">
+            <div class="settings-label">
+              <div class="settings-label-title">Usage</div>
+              <div class="settings-label-desc" id="api-usage-desc">Your API usage counts toward your daily generation limit</div>
+            </div>
+            <span id="api-usage-display" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-muted);">—</span>
+          </div>
+          <div style="margin-top:1rem;">
+            <details style="font-family:var(--font-mono);font-size:0.78rem;color:var(--text-muted);">
+              <summary style="cursor:pointer;font-weight:600;color:var(--text);margin-bottom:0.75rem;">📖 API Documentation</summary>
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:1rem;line-height:1.8;">
+                <p style="margin-bottom:0.75rem;">Send a POST request to <code style="background:var(--surface3);padding:2px 6px;border-radius:4px;font-size:0.75rem;">https://forkd-ai.com/api/generate</code> with your API key.</p>
+                <p style="margin-bottom:0.5rem;font-weight:600;color:var(--text);">Example:</p>
+                <pre style="background:var(--surface3);padding:0.75rem;border-radius:6px;overflow-x:auto;font-size:0.72rem;line-height:1.6;">curl -X POST https://forkd-ai.com/api/generate \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "commits": "feat: add login\nfix: fix bug\nchore: update deps",
+    "template": "compact",
+    "language": "en",
+    "version": "v1.1.0",
+    "sections": "Added,Fixed,Changed"
+  }'</pre>
+                <div style="margin-top:0.75rem;display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+                  <div><strong style="color:var(--text);">commits</strong> (required) — raw git commits</div>
+                  <div><strong style="color:var(--text);">template</strong> — default, compact, detailed, keepachangelog, release-notes</div>
+                  <div><strong style="color:var(--text);">language</strong> — en, es, fr, de, pt, zh, ja, ko, tr, ar</div>
+                  <div><strong style="color:var(--text);">version</strong> — tag/version string</div>
+                  <div><strong style="color:var(--text);">sections</strong> — comma-separated custom sections</div>
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CANCEL MODAL -->
+  <div id="cancel-modal" class="modal">
+    <div class="modal-content">
+      <h2 class="modal-title">Cancel Subscription?</h2>
+      <p class="modal-desc">
+        You're about to cancel your Pro subscription. You'll keep Pro access until the end of your current billing period. After that, you'll revert to the Free plan.<br/><br/>
+        <strong>You won't be charged again.</strong>
+      </p>
+      <div class="modal-actions">
+        <button id="cancel-confirm" class="btn btn-danger">Yes, Cancel</button>
+        <button id="cancel-close" class="btn btn-secondary">Keep Subscription</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY DETAIL MODAL -->
+  <div id="history-modal" class="modal">
+    <div class="modal-content" style="max-width:560px;">
+      <h2 class="modal-title" id="history-modal-title">Changelog</h2>
+      <div class="history-modal-pre" id="history-modal-body"></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="copyHistoryModal()">Copy</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('history-modal').classList.remove('active')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut, linkWithPopup, GoogleAuthProvider, GithubAuthProvider, unlink } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBu1N-awPnUjXAVqzWtCyhxTDBC-4QPNak",
+      authDomain: "changlelog-generator.firebaseapp.com",
+      projectId: "changlelog-generator",
+      storageBucket: "changlelog-generator.firebasestorage.app",
+      messagingSenderId: "640801556466",
+      appId: "1:640801556466:web:2bce80e0bab1021cc44d6b"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUser = null;
+    let userPlan = 'free';
+    let allHistory = [];
+
+    // ── Load preferences ──
+    function loadPreferences() {
+      const darkOn = localStorage.getItem('darkMode') !== 'false';
+      const animOn = localStorage.getItem('animationsEnabled') !== 'false';
+      if (!darkOn) { document.body.classList.add('light-mode'); document.getElementById('toggle-dark').classList.remove('active'); }
+      if (!animOn) { document.body.classList.add('no-animations'); document.getElementById('toggle-anim').classList.remove('active'); }
+      // Release notifications are stored on the user document and loaded after auth.
+    }
+    loadPreferences();
+
+    // ── Toggle handlers ──
+    function bindToggle(id, onFn) {
+      document.getElementById(id)?.addEventListener('click', function() {
+        this.classList.toggle('active');
+        onFn(this.classList.contains('active'));
+      });
+    }
+    bindToggle('toggle-dark', v => { document.body.classList.toggle('light-mode', !v); localStorage.setItem('darkMode', v); });
+    bindToggle('toggle-anim', v => { document.body.classList.toggle('no-animations', !v); localStorage.setItem('animationsEnabled', v); });
+    bindToggle('toggle-email', v => {
+      if (!currentUser) return;
+      currentUser.getIdToken()
+        .then(idToken => fetch('/api/user/notification-preferences', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+          body: JSON.stringify({ notifyFollowedReleases: v }),
+        }))
+        .catch(e => console.error('Could not save notification preference:', e));
+    });
+
+    // Load the persisted release-notification preference once signed in.
+    async function loadNotificationPrefs() {
+      const el = document.getElementById('toggle-email');
+      if (!el || !currentUser) return;
+      try {
+        const idToken = await currentUser.getIdToken();
+        const res = await fetch('/api/user/notification-preferences', { headers: { 'Authorization': `Bearer ${idToken}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        el.classList.toggle('active', data.preferences?.notifyFollowedReleases !== false);
+      } catch (e) { console.error('Could not load notification preference:', e); }
+    }
+
+    // ── Section navigation ──
+    // BUG FIX: showSection was using `event` (implicit global) which breaks in strict mode / when called programmatically
+    window.showSection = (section, el) => {
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.getElementById(section)?.classList.add('active');
+
+      document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+      const target = el instanceof Element ? el : (el?.target ? el.target.closest('.menu-item') : null);
+      target?.classList.add('active');
+
+      const titles = { home: 'Dashboard', history: 'History', analytics: 'Analytics', account: 'Account', settings: 'Settings', billing: 'Billing', shared: 'Shared', following: 'Following', 'branding': 'Branding', 'api-access': 'API Access' };
+      document.getElementById('section-title').textContent = titles[section] || '';
+
+      if (section === 'analytics') renderAnalytics();
+      if (section === 'history') renderHistoryTable();
+      if (section === 'account') renderAccountSettings();
+      if (section === 'shared') loadSharedChangelogs();
+      if (section === 'following') { loadFollowingProjects(); loadFollowingChangelogs(); }
+      if (section === 'branding') loadBrandingSettings();
+      if (section === 'api-access') loadApiKeyStatus();
+    };
+
+    // Deep links: /dashboard.html#following opens the Following section.
+    function applyHashSection() {
+      const hash = (location.hash || '').replace('#', '');
+      if (!hash) return;
+      const target = document.getElementById(hash);
+      if (target && target.classList.contains('section')) {
+        showSection(hash, document.querySelector('[onclick*="' + hash + '"]'));
+      }
+    };
+
+    // ── Auth ──
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) { window.location.href = 'login.html'; return; }
+      currentUser = user;
+
+      const av = document.getElementById('user-avatar');
+      if (user.photoURL) { av.src = user.photoURL; av.style.display = 'block'; }
+      document.getElementById('user-name').textContent = user.displayName || 'User';
+      document.getElementById('user-email').textContent = user.email || '';
+
+      await loadUserData(user.uid);
+      loadLocalHistory();
+      startResetCountdown();
+
+      // Auto-refresh shared section when returning from generator
+      const checkSharedUpdate = () => {
+        if (localStorage.getItem('forkd_shared_update')) {
+          const sharedSection = document.getElementById('shared');
+          if (sharedSection?.classList.contains('active')) {
+            loadSharedChangelogs();
+          }
+        }
+      };
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) checkSharedUpdate();
+      });
+      window.addEventListener('focus', checkSharedUpdate);
+
+      applyHashSection();
+      window.addEventListener('hashchange', applyHashSection);
+      loadNotificationPrefs();
+    });
+
+    // ── Shared changelogs ──
+    async function loadSharedChangelogs() {
+      // Consume any pending shared update flag from generator
+      localStorage.removeItem('forkd_shared_update');
+      const tbody = document.getElementById('shared-tbody');
+      tbody.innerHTML = '<tr><td colspan="5"><div class="empty-history">Loading shared changelogs…</div></td></tr>';
+
+      try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch('/user-shared-changelogs', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          tbody.innerHTML = '<tr><td colspan="5"><div class="empty-history" style="color:var(--danger);">Failed to load shared changelogs.</div></td></tr>';
+          return;
+        }
+
+        const data = await response.json();
+        const items = data.items || [];
+
+        if (items.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5"><div class="empty-history">No shared changelogs yet. Generate a changelog and click "Share ↗" to create one!</div></td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = items.map(item => {
+          const date = item.createdAt
+            ? new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : '—';
+          const link = `${window.location.origin}/shared/${item.id}`;
+          return `<tr>
+            <td><strong style="font-size:0.9rem;">${escapeHtml(item.title || 'Untitled')}</strong></td>
+            <td><span class="history-version">${escapeHtml(item.version || '—')}</span></td>
+            <td><span style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text-muted);">${item.views || 0} views</span></td>
+            <td><span class="history-date">${date}</span></td>
+            <td>
+              <div class="history-actions">
+                <button class="btn-xs" onclick="copySharedLink('${link}')">Copy Link</button>
+                <button class="btn-xs" onclick="deleteSharedChangelog('${item.id}', this)" style="color:var(--danger);border-color:rgba(255,69,69,0.2);">Delete</button>
+              </div>
+            </td>
+          </tr>`;
+        }).join('');
+      } catch(err) {
+        console.error('loadSharedChangelogs error:', err);
+        tbody.innerHTML = '<tr><td colspan="5"><div class="empty-history" style="color:var(--danger);">Error loading shared changelogs.</div></td></tr>';
+      }
+    }
+
+    window.copySharedLink = async (url) => {
+      try {
+        await navigator.clipboard.writeText(url);
+        showAlert('Link copied to clipboard!', 'success');
+      } catch {
+        showAlert('Could not copy link automatically. Select and copy manually.', 'error');
+      }
+    };
+
+    window.deleteSharedChangelog = async (id, btn) => {
+      if (!confirm('Delete this shared changelog? The public link will stop working.')) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Deleting…';
+
+      try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch(`/shared-changelogs/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          showAlert(err.error || 'Failed to delete', 'error');
+          btn.disabled = false;
+          btn.textContent = 'Delete';
+          return;
+        }
+
+        showAlert('Shared changelog deleted.', 'success');
+        loadSharedChangelogs(); // Refresh the list
+      } catch(err) {
+        console.error('deleteSharedChangelog error:', err);
+        showAlert('Error deleting shared changelog.', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Delete';
+      }
+    };
+
+    // ── Escape HTML helper ──
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ── Branding ──
+    window.loadBrandingSettings = async () => {
+      if (userPlan !== 'pro') {
+        document.querySelector('#branding .settings-group')?.classList.add('hidden');
+        let proMsg = document.getElementById('branding-pro-msg');
+        if (!proMsg) {
+          proMsg = document.createElement('div');
+          proMsg.id = 'branding-pro-msg';
+          proMsg.className = 'settings-group';
+          proMsg.innerHTML = '<div style="text-align:center;padding:2.5rem 1rem;"><div style="font-size:2.5rem;margin-bottom:1rem;">🔒</div><div style="font-size:1.1rem;font-weight:700;margin-bottom:0.5rem;">Pro Plan Required</div><p style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text-muted);line-height:1.7;max-width:380px;margin:0 auto;">Custom branding is available on the Pro plan. Upgrade to customize your shared changelog pages with your own logo, colors, and brand name.</p><a id="branding-upgrade-btn" href="#" class="btn btn-primary" style="display:inline-flex;margin-top:1.25rem;">Upgrade to Pro →</a></div>';
+          document.getElementById('branding')?.appendChild(proMsg);
+        }
+        proMsg.classList.remove('hidden');
+        const checkoutUrl = `https://forkd-ai.lemonsqueezy.com/checkout/buy/694c1134-b4a4-455a-a369-e6c584820781?checkout[custom][user_id]=${currentUser?.uid}`;
+        document.getElementById('branding-upgrade-btn')?.setAttribute('href', checkoutUrl);
+        return;
+      }
+      document.querySelector('#branding .settings-group')?.classList.remove('hidden');
+      const proMsg = document.getElementById('branding-pro-msg');
+      if (proMsg) proMsg.classList.add('hidden');
+      try {
+        const token = await currentUser.getIdToken();
+        const resp = await fetch('/user/branding', { headers: { 'Authorization': `Bearer ${token}` } });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.brandName) document.getElementById('brand-name-input').value = data.brandName;
+          if (data.accentColor) document.getElementById('brand-accent-input').value = data.accentColor;
+          if (data.bgColor) document.getElementById('brand-bg-input').value = data.bgColor;
+          if (data.logoUrl) document.getElementById('brand-logo-input').value = data.logoUrl;
+          if (data.hideBranding) document.getElementById('toggle-hide-branding').classList.add('active');
+        }
+      } catch(e) { console.error('loadBranding error:', e); }
+    };
+
+    document.getElementById('save-branding-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('save-branding-btn');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      try {
+        const token = await currentUser.getIdToken();
+        const resp = await fetch('/user/branding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({
+            brandName: document.getElementById('brand-name-input').value.trim(),
+            accentColor: document.getElementById('brand-accent-input').value,
+            bgColor: document.getElementById('brand-bg-input').value,
+            logoUrl: document.getElementById('brand-logo-input').value.trim(),
+            hideBranding: document.getElementById('toggle-hide-branding').classList.contains('active')
+          })
+        });
+        if (resp.ok) {
+          const status = document.getElementById('branding-status');
+          status.style.display = 'inline-flex';
+          setTimeout(() => { status.style.display = 'none'; }, 2500);
+        }
+      } catch(e) { console.error('Save branding error:', e); }
+      btn.disabled = false;
+      btn.textContent = 'Save Branding';
+    });
+
+    // ── API Key ──
+    window.loadApiKeyStatus = async () => {
+      if (userPlan !== 'pro') {
+        document.querySelector('#api-access .settings-group')?.classList.add('hidden');
+        let proMsg = document.getElementById('api-pro-msg');
+        if (!proMsg) {
+          proMsg = document.createElement('div');
+          proMsg.id = 'api-pro-msg';
+          proMsg.className = 'settings-group';
+          proMsg.innerHTML = '<div style="text-align:center;padding:2.5rem 1rem;"><div style="font-size:2.5rem;margin-bottom:1rem;">🔑</div><div style="font-size:1.1rem;font-weight:700;margin-bottom:0.5rem;">Pro Plan Required</div><p style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text-muted);line-height:1.7;max-width:380px;margin:0 auto;">API access is available on the Pro plan. Generate changelogs programmatically from your CI/CD pipelines, scripts, or any HTTP client.</p><a id="api-upgrade-btn" href="#" class="btn btn-primary" style="display:inline-flex;margin-top:1.25rem;">Upgrade to Pro →</a></div>';
+          document.getElementById('api-access')?.appendChild(proMsg);
+        }
+        proMsg.classList.remove('hidden');
+        const checkoutUrl = `https://forkd-ai.lemonsqueezy.com/checkout/buy/694c1134-b4a4-455a-a369-e6c584820781?checkout[custom][user_id]=${currentUser?.uid}`;
+        document.getElementById('api-upgrade-btn')?.setAttribute('href', checkoutUrl);
+        return;
+      }
+      document.querySelector('#api-access .settings-group')?.classList.remove('hidden');
+      const proMsg = document.getElementById('api-pro-msg');
+      if (proMsg) proMsg.classList.add('hidden');
+      try {
+        const token = await currentUser.getIdToken();
+        const snap = await getDoc(doc(db, 'users', currentUser.uid));
+        const data = snap.data() || {};
+        const apiKey = data.apiKey;
+        const display = document.getElementById('api-key-display');
+        const copyBtn = document.getElementById('copy-api-key-btn');
+        const genBtn = document.getElementById('generate-api-key-btn');
+        const revokeBtn = document.getElementById('revoke-api-key-btn');
+        if (apiKey) {
+          display.textContent = apiKey.slice(0, 14) + '…' + apiKey.slice(-6);
+          display.style.display = 'inline-block';
+          display.dataset.fullKey = apiKey;
+          copyBtn.style.display = 'inline-flex';
+          genBtn.textContent = 'Regenerate Key';
+          revokeBtn.style.display = 'inline-flex';
+        } else {
+          display.style.display = 'none';
+          copyBtn.style.display = 'none';
+          genBtn.textContent = 'Generate Key';
+          revokeBtn.style.display = 'none';
+        }
+      } catch(e) { console.error('loadApiKey error:', e); }
+    };
+
+    window.copyApiKey = () => {
+      const display = document.getElementById('api-key-display');
+      const key = display.dataset.fullKey;
+      if (key) navigator.clipboard.writeText(key).then(() => {
+        const btn = document.getElementById('copy-api-key-btn');
+        btn.textContent = '✓ Copied';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+      });
+    };
+
+    document.getElementById('generate-api-key-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('generate-api-key-btn');
+      btn.disabled = true;
+      btn.textContent = 'Generating…';
+      try {
+        const token = await currentUser.getIdToken();
+        const resp = await fetch('/user/api-key/generate', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (resp.ok) {
+          loadApiKeyStatus();
+          showAlert('API key generated! Copy it now — you won\'t see it again.', 'success');
+        } else {
+          const data = await resp.json();
+          showAlert(data.error || 'Failed to generate key', 'error');
+        }
+      } catch(e) { console.error('Generate API key error:', e); }
+      btn.disabled = false;
+      btn.textContent = 'Generate Key';
+    });
+
+    document.getElementById('revoke-api-key-btn')?.addEventListener('click', async () => {
+      if (!confirm('Revoke your API key? Any services using it will stop working.')) return;
+      try {
+        const token = await currentUser.getIdToken();
+        const resp = await fetch('/user/api-key', { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+        if (resp.ok) {
+          loadApiKeyStatus();
+          showAlert('API key revoked.', 'success');
+        }
+      } catch(e) { console.error('Revoke API key error:', e); }
+    });
+
+    // Toggle handlers for branding switches
+    bindToggle('toggle-hide-branding', v => {});
+
+    // ── Save Profile (bio) ──
+    document.getElementById('save-profile-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('save-profile-btn');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      try {
+        const token = await currentUser.getIdToken();
+        const bio = document.getElementById('account-bio-input').value.trim();
+        const resp = await fetch('/user/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ bio, displayName: currentUser.displayName })
+        });
+        if (resp.ok) {
+          const status = document.getElementById('profile-status');
+          status.style.display = 'inline-flex';
+          setTimeout(() => { status.style.display = 'none'; }, 3000);
+        }
+      } catch(e) { console.error('Save profile error:', e); }
+      btn.disabled = false;
+      btn.textContent = 'Save Profile';
+    });
+
+    // ── Load user data ──
+    async function loadUserData(uid) {
+      try {
+        const snap = await getDoc(doc(db, 'users', uid));
+        const data = snap.data() || {};
+        userPlan = data.status || 'free';
+
+        const today = new Date().toISOString().split('T')[0];
+        const usedToday = data[`usage_${today}`] || 0;         const limit = userPlan === 'pro' ? 50 : 25;
+        const totalGens = data.totalGenerations || 0;
+        const isCancelled = data.subscriptionCancelled || false;
+        const endsAt = data.subscriptionEndsAt || null;
+
+        // Build usage data for this week from Firestore keys
+        const weekData = [];
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(); d.setDate(d.getDate() - i);
+          const key = `usage_${d.toISOString().split('T')[0]}`;
+          weekData.push({ label: ['Su','Mo','Tu','We','Th','Fr','Sa'][d.getDay()], count: data[key] || 0, isToday: i === 0 });
+        }
+
+        // Plan UI
+        document.getElementById('sub-plan').textContent = userPlan === 'pro' ? 'Pro' : 'Free';
+        document.getElementById('sub-desc').textContent = userPlan === 'pro' ? 'Up to 50 changelogs per day with priority support.' : 'Perfect for solo developers and side projects.';
+        document.getElementById('plan-badge-label').textContent = userPlan === 'pro' ? 'PRO PLAN' : 'FREE PLAN';
+        document.getElementById('total-gens').textContent = totalGens;
+        document.getElementById('a-total').textContent = totalGens;
+
+        const joinDate = data.createdAt ? new Date(data.createdAt.toDate()) : null;
+        document.getElementById('member-since').textContent = joinDate ? joinDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—';
+
+        // Shared views stat (from user's shared changelogs)
+        (async () => {
+          try {
+            const token = await currentUser.getIdToken();
+            const svResp = await fetch('/user-shared-changelogs', { headers: { 'Authorization': `Bearer ${token}` } });
+            if (svResp.ok) {
+              const svData = await svResp.json();
+              const totalViews = (svData.items || []).reduce((sum, item) => sum + (item.views || 0), 0);
+              document.getElementById('shared-views').textContent = totalViews;
+            }
+          } catch (_) {}
+        })();
+
+        // Usage bar
+        const pct = Math.min((usedToday / limit) * 100, 100);
+        const bar = document.getElementById('usage-bar');
+        bar.style.width = pct + '%';
+        bar.className = 'usage-bar-fill' + (pct >= 100 ? ' danger' : pct >= 80 ? ' warn' : '');
+        document.getElementById('usage-fraction').textContent = `${usedToday} / ${limit}`;
+
+        // Upgrade / cancel buttons
+        const checkoutUrl = `https://forkd-ai.lemonsqueezy.com/checkout/buy/694c1134-b4a4-455a-a369-e6c584820781?checkout[custom][user_id]=${uid}`;
+        if (userPlan === 'pro') {
+          document.getElementById('upgrade-btn').classList.add('hidden');
+          document.getElementById('billing-upgrade-btn').classList.add('hidden');
+          document.getElementById('billing-plan').textContent = 'Pro Plan';
+          document.getElementById('billing-plan-desc').textContent = '$5 / month · 50 changelogs per day';
+          if (isCancelled && endsAt) {
+            document.getElementById('cancel-btn').classList.add('hidden');
+            const cancelNotice = document.getElementById('cancel-notice');
+            cancelNotice.classList.remove('hidden');
+            document.getElementById('end-date-display').textContent = new Date(endsAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+          } else {
+            document.getElementById('cancel-btn').classList.remove('hidden');
+          }
+        } else {
+          document.getElementById('upgrade-btn').href = checkoutUrl;
+          document.getElementById('upgrade-btn').classList.remove('hidden');
+          document.getElementById('billing-upgrade-btn').href = checkoutUrl;
+          document.getElementById('billing-upgrade-btn').classList.remove('hidden');
+          document.getElementById('cancel-btn').classList.add('hidden');
+        }
+
+        // Week chart on home
+        renderWeekChart(weekData);
+
+        // Store week data for analytics
+        window._weekData = weekData;
+
+      } catch (err) {
+        console.error('loadUserData error:', err);
+        showAlert('Failed to load account data.', 'error');
+      }
+    }
+
+    // ── Week chart ──
+    function renderWeekChart(weekData) {
+      const max = Math.max(...weekData.map(d => d.count), 1);
+      const el = document.getElementById('week-chart');
+      el.innerHTML = weekData.map(d => `
+        <div class="bar-col">
+          <div class="bar-fill" style="height:${Math.max((d.count / max) * 80, d.count > 0 ? 4 : 0)}px;${d.isToday ? 'background:var(--accent);border-color:var(--accent);' : ''}"></div>
+          <div class="bar-label">${d.label}</div>
+        </div>`).join('');
+    }
+
+    // ── Local history ──
+    function loadLocalHistory() {
+      try { allHistory = JSON.parse(localStorage.getItem('changelog_history') || '[]'); } catch(e) { allHistory = []; }
+      // Limit based on plan
+      const limit = userPlan === 'pro' ? Infinity : 25;
+      if (allHistory.length > limit && Number.isFinite(limit)) allHistory = allHistory.slice(0, limit);
+      document.getElementById('history-limit-note').textContent = userPlan === 'free' ? 'Free plan stores up to 25. Upgrade to Pro for unlimited history.' : '';
+    }
+
+    // ── Account settings ──
+    async function renderAccountSettings() {
+      if (!currentUser) return;
+
+      // Display profile info
+      document.getElementById('account-email').textContent = currentUser.email || '—';
+      document.getElementById('account-displayname').textContent = currentUser.displayName || 'Not set';
+      
+      // Load bio from Firestore
+      try {
+        const snap = await getDoc(doc(db, 'users', currentUser.uid));
+        const userData = snap.data() || {};
+        if (userData.bio) document.getElementById('account-bio-input').value = userData.bio;
+      } catch(e) {}
+      const createdAt = new Date(currentUser.metadata.creationTime);
+      document.getElementById('account-created').textContent = createdAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+      // Get connected providers
+      const providers = currentUser.providerData.map(p => p.providerId);
+      const connectedProvidersHtml = providers.length > 0
+        ? providers.map(providerId => {
+            const providerInfo = {
+              'google.com': { 
+                name: 'Google', 
+                icon: '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="display:inline;margin-right:8px;vertical-align:-2px;"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>'
+              },
+              'github.com': { 
+                name: 'GitHub', 
+                icon: '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="display:inline;margin-right:8px;vertical-align:-2px;"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>'
+              },
+              'password': { 
+                name: 'Email/Password', 
+                icon: '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:8px;vertical-align:-2px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'
+              }
+            };
+            const info = providerInfo[providerId] || { name: providerId, icon: '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:inline;margin-right:8px;vertical-align:-2px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>' };
+            return `
+              <div class="settings-item">
+                <div class="settings-label">
+                  <div class="settings-label-title">${info.icon} ${info.name}</div>
+                  <div class="settings-label-desc">Connected as ${currentUser.email}</div>
+                </div>
+                ${providers.length > 1 && providerId !== 'password' ? `
+                  <button class="btn btn-danger" style="width:auto;padding:8px 16px;" onclick="unlinkProvider('${providerId}')">Unlink</button>
+                ` : '<span style="font-size:0.8rem;color:var(--text-dim);">Primary</span>'}
+              </div>
+            `;
+          }).join('')
+        : '<div style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text-dim);padding:1rem;text-align:center;">No providers connected</div>';
+
+      document.getElementById('connected-providers-list').innerHTML = connectedProvidersHtml;
+
+      // Show link buttons for providers not yet connected
+      const hasGoogle = providers.includes('google.com');
+      const hasGithub = providers.includes('github.com');
+      
+      document.getElementById('link-google-btn').style.display = hasGoogle ? 'none' : 'inline-flex';
+      document.getElementById('link-github-btn').style.display = hasGithub ? 'none' : 'inline-flex';
+    }
+
+    window.linkProvider = async (providerName) => {
+      if (!currentUser) return showAccountAlert('Not logged in', 'error');
+      
+      let provider;
+      if (providerName === 'google') {
+        provider = new GoogleAuthProvider();
+      } else {
+        provider = new GithubAuthProvider();
+        provider.addScope('repo'); // Request repo access
+      }
+      
+      const providerName_full = providerName === 'google' ? 'Google' : 'GitHub';
+      const btn = document.getElementById(`link-${providerName}-btn`);
+      
+      btn.disabled = true;
+      btn.textContent = `Linking ${providerName_full}…`;
+
+      try {
+        await linkWithPopup(currentUser, provider);
+        
+        // Store GitHub username if linking GitHub
+        if (providerName === 'github') {
+          // Get the GitHub info from the newly linked provider
+          const githubProvider = currentUser.providerData.find(p => p.providerId === 'github.com');
+          if (githubProvider) {
+            const githubId = githubProvider.uid;
+            console.log('GitHub ID:', githubId);
+            
+            try {
+              const token = await currentUser.getIdToken();
+              const response = await fetch('/store-github-id', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ githubId })
+              });
+              const data = await response.json();
+              console.log('Store GitHub ID response:', data);
+            } catch (err) {
+              console.error('Error storing GitHub ID:', err);
+            }
+          }
+        }
+        
+        showAccountAlert(`${providerName_full} linked successfully!`, 'success');
+        renderAccountSettings();
+      } catch (error) {
+        console.error('Link error:', error);
+        if (error.code === 'auth/provider-already-linked') {
+          showAccountAlert(`${providerName_full} is already linked to this account.`, 'error');
+        } else if (error.code === 'auth/credential-already-in-use') {
+          showAccountAlert(`This ${providerName_full} account is already linked to another email.`, 'error');
+        } else if (error.code === 'auth/popup-closed-by-user') {
+          // User closed the popup, no error needed
+        } else {
+          showAccountAlert(`Failed to link ${providerName_full}: ${error.message}`, 'error');
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = `Link ${providerName_full}`;
+      }
+    };
+
+    window.unlinkProvider = async (providerId) => {
+      if (!currentUser) return showAccountAlert('Not logged in', 'error');
+      if (!confirm('Are you sure? You can still sign in with your other linked providers.')) return;
+
+      const providerName = providerId === 'google.com' ? 'Google' : providerId === 'github.com' ? 'GitHub' : 'this provider';
+      
+      try {
+        await unlink(currentUser, providerId);
+        showAccountAlert(`${providerName} unlinked successfully.`, 'success');
+        renderAccountSettings();
+      } catch (error) {
+        console.error('Unlink error:', error);
+        showAccountAlert(`Failed to unlink ${providerName}: ${error.message}`, 'error');
+      }
+    };
+
+    function showAccountAlert(msg, type = 'success') {
+      const c = document.getElementById('account-alerts');
+      const el = document.createElement('div');
+      el.className = `alert alert-${type}`;
+      el.textContent = msg;
+      el.style.marginBottom = '1rem';
+      c.innerHTML = '';
+      c.appendChild(el);
+      setTimeout(() => el.remove(), 5000);
+    }
+
+    window._historyFilter = '';
+    window.filterHistory = () => {
+      window._historyFilter = document.getElementById('history-search').value.toLowerCase();
+      renderHistoryTable();
+    };
+
+    function renderHistoryTable() {
+      const q = window._historyFilter || '';
+      const filtered = q ? allHistory.filter(e => (e.markdown || '').toLowerCase().includes(q) || (e.version || '').toLowerCase().includes(q)) : allHistory;
+      const tbody = document.getElementById('history-tbody');
+      if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="5"><div class="empty-history">${q ? 'No results found.' : 'No history yet. Generate your first changelog!'}</div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = filtered.map((e, i) => `
+        <tr>
+          <td><span class="history-version">${e.version || 'v1.0.0'}</span></td>
+          <td><div class="history-preview">${(e.markdown || '').replace(/\n/g, ' ').substring(0, 80)}…</div></td>
+          <td><span class="history-date">${e.date || '—'}</span></td>
+          <td><span class="history-tag">${e.source || 'manual'}</span></td>
+          <td>
+            <div class="history-actions">
+              <button class="btn-xs" onclick="viewHistory(${i})">View</button>
+              <button class="btn-xs" onclick="copyHistory(${i})">Copy</button>
+            </div>
+          </td>
+        </tr>`).join('');
+    }
+
+    window.viewHistory = (i) => {
+      const filtered = window._historyFilter
+        ? allHistory.filter(e => (e.markdown||'').toLowerCase().includes(window._historyFilter)||(e.version||'').toLowerCase().includes(window._historyFilter))
+        : allHistory;
+      const e = filtered[i];
+      document.getElementById('history-modal-title').textContent = `${e.version || 'v1.0.0'} · ${e.date || '—'}`;
+      document.getElementById('history-modal-body').textContent = e.markdown || '';
+      window._currentModalMarkdown = e.markdown || '';
+      document.getElementById('history-modal').classList.add('active');
+    };
+    window.copyHistory = (i) => {
+      const filtered = window._historyFilter
+        ? allHistory.filter(e => (e.markdown||'').toLowerCase().includes(window._historyFilter))
+        : allHistory;
+      navigator.clipboard.writeText(filtered[i]?.markdown || '').then(() => showAlert('Copied!', 'success'));
+    };
+    window.copyHistoryModal = () => {
+      navigator.clipboard.writeText(window._currentModalMarkdown || '').then(() => showAlert('Copied!', 'success'));
+    };
+    window.clearHistory = () => {
+      if (!confirm('Clear all local changelog history? This cannot be undone.')) return;
+      localStorage.removeItem('changelog_history');
+      allHistory = [];
+      renderHistoryTable();
+      showAlert('History cleared.', 'success');
+    };
+
+    // Close modals on backdrop click
+    document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
+
+    // ── Analytics ──
+    function renderAnalytics() {
+      // Week data
+      const wd = window._weekData || [];
+      const weekTotal = wd.reduce((s, d) => s + d.count, 0);
+      const avg = wd.length ? (weekTotal / 7).toFixed(1) : 0;
+      const peak = wd.reduce((p, d) => d.count > p.count ? d : p, { count: 0, label: '—' });
+      document.getElementById('a-week').textContent = weekTotal;
+      document.getElementById('a-avg').textContent = avg;
+      document.getElementById('a-peak').textContent = peak.count > 0 ? peak.label : '—';
+
+      // 14-day chart
+      const chart14 = document.getElementById('analytics-chart');
+      const max14 = Math.max(...wd.map(d => d.count), 1);
+      chart14.innerHTML = wd.map(d => `
+        <div class="bar-col">
+          <div class="bar-fill" style="height:${Math.max((d.count/max14)*100,d.count>0?4:0)}px;${d.isToday?'background:var(--accent);border-color:var(--accent);':''}"></div>
+          <div class="bar-label">${d.label}</div>
+        </div>`).join('');
+
+      // Commit type breakdown from local history
+      const types = { Added: 0, Fixed: 0, Changed: 0, Removed: 0 };
+      allHistory.forEach(e => {
+        const md = e.markdown || '';
+        if (/## Added/i.test(md)) types.Added += (md.match(/^- .+/gm) || []).filter(l => /## Added/.test(md.substring(0, md.indexOf(l)))).length || 1;
+        if (/## Fixed/i.test(md)) types.Fixed++;
+        if (/## Changed/i.test(md)) types.Changed++;
+        if (/## Removed/i.test(md)) types.Removed++;
+      });
+      const maxType = Math.max(...Object.values(types), 1);
+      const colors = { Added: 'rgba(40,200,64,0.6)', Fixed: 'rgba(255,69,69,0.6)', Changed: 'rgba(100,160,255,0.6)', Removed: 'rgba(245,158,11,0.6)' };
+      const typeChart = document.getElementById('commit-type-chart');
+      if (Object.values(types).some(v => v > 0)) {
+        typeChart.innerHTML = Object.entries(types).map(([k, v]) => `
+          <div class="commit-type-row">
+            <div class="commit-type-name">${k}</div>
+            <div class="commit-type-track"><div class="commit-type-fill" style="width:${(v/maxType)*100}%;background:${colors[k]};"></div></div>
+            <div class="commit-type-count">${v}</div>
+          </div>`).join('');
+      } else {
+        typeChart.innerHTML = `<div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-dim);">Generate some changelogs to see analytics.</div>`;
+      }
+    }
+
+    // ── Reset countdown ──
+    function startResetCountdown() {
+      function tick() {
+        const now = new Date();
+        const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+        const diff = tomorrow - now;
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        const str = `${h}h ${m}m ${s}s`;
+        const el1 = document.getElementById('reset-countdown');
+        const el2 = document.getElementById('billing-reset');
+        if (el1) el1.textContent = str;
+        if (el2) el2.textContent = str;
+      }
+      tick();
+      setInterval(tick, 1000);
+    }
+
+    // ── Logout ──
+    window.logoutUser = () => signOut(auth).then(() => window.location.href = 'login.html');
+
+    // ── Cancel subscription ──
+    const cancelModal = document.getElementById('cancel-modal');
+    document.getElementById('cancel-btn')?.addEventListener('click', () => cancelModal.classList.add('active'));
+    document.getElementById('cancel-close')?.addEventListener('click', () => cancelModal.classList.remove('active'));
+    document.getElementById('cancel-confirm')?.addEventListener('click', async () => {
+      if (!currentUser) return;
+      const btn = document.getElementById('cancel-confirm');
+      btn.disabled = true; btn.textContent = 'Cancelling…';
+      try {
+        const token = await currentUser.getIdToken();
+        const res = await fetch('/cancel-subscription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({})
+        });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
+        const data = await res.json();
+        const endsAt = data.endsAt ? new Date(data.endsAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'end of period';
+        showAlert(`Subscription cancelled. Access ends ${endsAt}.`, 'success');
+        cancelModal.classList.remove('active');
+        setTimeout(() => loadUserData(currentUser.uid), 800);
+      } catch(err) {
+        showAlert(err.message, 'error');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Yes, Cancel';
+      }
+    });
+
+    // ── Alerts ──
+    function showAlert(msg, type = 'success') {
+      const c = document.getElementById('alert-container');
+      const el = document.createElement('div');
+      el.className = `alert alert-${type}`;
+      el.textContent = msg;
+      c.innerHTML = ''; c.appendChild(el);
+      setTimeout(() => el.remove(), 4000);
+    }
+  
+
+    function ta(d) {
+      if (!d) return 'recently';
+      const n = Date.now() - new Date(d).getTime(), m = Math.floor(n / 60000);
+      if (m < 1) return 'just now';
+      if (m < 60) return m + 'm ago';
+      const h = Math.floor(m / 60);
+      if (h < 24) return h + 'h ago';
+      const D = Math.floor(h / 24);
+      if (D < 7) return D + 'd ago';
+      return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s || '';
+      return d.innerHTML;
+    }
+
+    // ── Following: projects ──
+    async function loadFollowingProjects() {
+      const listEl = document.getElementById('followed-projects-list');
+      const feedEl = document.getElementById('followed-projects-feed');
+      if (!listEl || !feedEl) return;
+      if (!currentUser) {
+        listEl.innerHTML = '<div class="empty-history">Please log in to see followed projects.</div>';
+        feedEl.innerHTML = '<div class="empty-history">Please log in to see followed projects.</div>';
+        return;
+      }
+      listEl.innerHTML = '<div class="spinner"></div>';
+      feedEl.innerHTML = '<div class="spinner"></div>';
+      try {
+        const idToken = await currentUser.getIdToken();
+        const headers = { 'Authorization': `Bearer ${idToken}` };
+        const [projectsRes, feedRes] = await Promise.all([
+          fetch('/api/projects/following/mine', { headers }),
+          fetch('/api/feed/projects?limit=20', { headers }),
+        ]);
+        const projectsData = projectsRes.ok ? await projectsRes.json() : { items: [] };
+        const feedData = feedRes.ok ? await feedRes.json() : { items: [] };
+        const projects = projectsData.items || [];
+        const releases = feedData.items || [];
+
+        listEl.innerHTML = projects.length ? projects.map(p =>
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:0.7rem 0.9rem;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:0.5rem;">' +
+            '<div style="min-width:0;"><a href="/p/' + encodeURIComponent(p.slug) + '" style="font-size:0.85rem;font-weight:600;color:var(--text);text-decoration:none;">' + esc(p.name) + '</a>' +
+            '<div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-dim);margin-top:2px;">' + (p.releaseCount || 0) + ' releases · ' + esc(String(p.category || 'other').replace(/-/g, ' ')) + '</div></div>' +
+            '<button class="btn btn-secondary" style="padding:5px 12px;font-size:0.75rem;width:auto;" onclick="unfollowProject(\'' + p.slug + '\')">Unfollow</button>' +
+          '</div>').join('')
+          : '<div class="empty-history">You are not following any projects yet. <a href="/discover?view=projects" style="color:var(--accent);text-decoration:underline;">Discover projects →</a></div>';
+
+        feedEl.innerHTML = releases.length ? releases.map(r =>
+          '<a href="/shared/' + encodeURIComponent(r.id) + '" style="display:block;padding:0.8rem 0.95rem;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:0.5rem;text-decoration:none;color:var(--text);">' +
+            '<div style="font-size:0.7rem;font-weight:700;color:var(--accent);margin-bottom:2px;">' + esc(r.projectName || r.projectSlug || '') + (r.version ? ' · ' + esc(r.version) : '') + '</div>' +
+            '<div style="font-size:0.85rem;font-weight:600;margin-bottom:2px;">' + esc(r.title) + '</div>' +
+            '<div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-dim);">' + ta(r.createdAt) + (r.imported ? ' · imported' : '') + '</div>' +
+          '</a>').join('')
+          : '<div class="empty-history">No releases from followed projects yet. <a href="/discover?view=projects" style="color:var(--accent);text-decoration:underline;">Follow a project →</a></div>';
+      } catch (e) {
+        console.error('Followed projects error:', e);
+        listEl.innerHTML = '<div class="empty-history">Failed to load followed projects. <button onclick="loadFollowingProjects()" class="btn btn-ghost" style="padding:4px 10px;font-size:0.75rem;">Retry</button></div>';
+        feedEl.innerHTML = '<div class="empty-history">Failed to load releases.</div>';
+      }
+    }
+
+    window.loadFollowingProjects = loadFollowingProjects;
+
+    window.unfollowProject = async function(slug) {
+      if (!currentUser) return;
+      try {
+        const idToken = await currentUser.getIdToken();
+        const res = await fetch('/api/projects/' + encodeURIComponent(slug) + '/follow', {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${idToken}` },
+        });
+        if (!res.ok) throw new Error('failed');
+        loadFollowingProjects();
+      } catch (e) {
+        console.error('Unfollow project error:', e);
+      }
+    };
+
+    async function loadFollowingChangelogs() {
+      const tbody = document.getElementById('following-tbody');
+      if (!tbody) return;
+      if (!currentUser) {
+        tbody.innerHTML = '<tr><td colspan="6"><div class="empty-history">Please log in to see your following feed.</div></td></tr>';
+        return;
+      }
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;"><div class="spinner"></div></td></tr>';
+      try {
+        const idToken = await currentUser.getIdToken();
+        const res = await fetch('/api/feed/following', {
+          headers: { 'Authorization': `Bearer ${idToken}` }
+        });
+        if (!res.ok) throw new Error('Failed to load');
+        const data = await res.json();
+        if (!data.items || data.items.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6"><div class="empty-history">No changelogs from followed users yet. <a href="/discover" style="color:var(--accent);text-decoration:underline;">Discover people to follow →</a></div></td></tr>';
+          return;
+        }
+        tbody.innerHTML = data.items.map(i => {
+          const timeAgo = ta(i.createdAt);
+          return '<tr>' +
+            '<td class="repo-cell"><span class="repo-name">' + esc(i.title || 'Untitled') + '</span></td>' +
+            '<td><span class="tag">' + esc(i.author || 'Anonymous') + '</span></td>' +
+            '<td><span class="tag"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' + (i.stars || 0) + '</span></td>' +
+            '<td><span class="tag"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' + (i.views || 0) + '</span></td>' +
+            '<td>' + timeAgo + '</td>' +
+            '<td><a href="' + (i.slug ? '/changelog/' + encodeURIComponent(i.slug) : '/shared/' + i.id) + '" class="btn-action" title="View"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></a></td>' +
+            '</tr>';
+        }).join('');
+      } catch(e) {
+        console.error('Following feed error:', e);
+        tbody.innerHTML = '<tr><td colspan="6"><div class="empty-history">Failed to load. <button onclick="loadFollowingChangelogs()" class="btn btn-ghost" style="padding:4px 10px;font-size:0.75rem;">Retry</button></div></td></tr>';
+      }
+    }
+</script>
+<script>
+(function(){
+  function esc(s){ var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+  function ta(d){ if(!d) return ''; var n = Date.now() - new Date(d).getTime(), m = Math.floor(n/60000); if(m<1) return 'just now'; if(m<60) return m+'m ago'; var h=Math.floor(m/60); if(h<24) return h+'h ago'; var D=Math.floor(h/24); if(D<7) return D+'d ago'; return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+
+  async function init(){
+    var feedEl = document.getElementById('personal-feed');
+    var orgsEl = document.getElementById('my-orgs');
+    if (!feedEl) return;
+    var auth = (window.firebase && window.firebase.auth) ? window.firebase.auth() : null;
+    if (!auth) { feedEl.innerHTML = '<div class="empty-history">Sign in to see your feed.</div>'; return; }
+
+    auth.onAuthStateChanged(async function(user){
+      if (!user) {
+        feedEl.innerHTML = '<div class="empty-history">Please log in to see your personal feed.</div>';
+        if (orgsEl) orgsEl.innerHTML = '<div class="empty-history">Please log in to see your organizations.</div>';
+        return;
+      }
+      try {
+        var token = await user.getIdToken();
+        var headers = { Authorization: 'Bearer ' + token };
+
+        var res = await fetch('/api/feed/me', { headers: headers });
+        var data = await res.json();
+        if (!data.items || !data.items.length) {
+          feedEl.innerHTML = '<div class="empty-history">Your feed is empty. <a href="/discover" style="color:var(--accent);text-decoration:underline;">Follow creators and organizations</a> to see their updates here.</div>';
+        } else {
+          feedEl.innerHTML = data.items.map(function(c){
+            var href = c.slug ? '/changelog/' + encodeURIComponent(c.slug) : '/shared/' + encodeURIComponent(c.id);
+            var owner = c.orgSlug
+              ? '<a href="/org/' + encodeURIComponent(c.orgSlug) + '" style="color:var(--accent);text-decoration:none;">' + esc(c.orgName || c.orgSlug) + '</a>'
+              : (c.authorUsername ? '<a href="/@' + encodeURIComponent(c.authorUsername) + '" style="color:var(--accent);text-decoration:none;">' + esc(c.author) + '</a>' : esc(c.author));
+            return '<a href="' + href + '" style="display:block;padding:12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;text-decoration:none;color:var(--text);">' +
+              '<div style="font-size:0.85rem;font-weight:700;">' + esc(c.title) + (c.version ? ' <span style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted);">' + esc(c.version) + '</span>' : '') + '</div>' +
+              '<div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-dim);margin-top:4px;">' + owner + ' · ' + ta(c.publishedAt || c.createdAt) + '</div>' +
+            '</a>';
+          }).join('');
+        }
+
+        if (orgsEl) {
+          var ores = await fetch('/api/orgs/mine', { headers: headers });
+          var odata = await ores.json();
+          if (!odata.items || !odata.items.length) {
+            orgsEl.innerHTML = '<div class="empty-history">You are not part of an organization yet. <a href="/publish" style="color:var(--accent);text-decoration:underline;">Create one</a>.</div>';
+          } else {
+            orgsEl.innerHTML = odata.items.map(function(o){
+              return '<a href="/org/' + encodeURIComponent(o.slug) + '" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;text-decoration:none;color:var(--text);">' +
+                '<span style="font-size:0.85rem;font-weight:600;">' + esc(o.name) + '</span>' +
+                '<span style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-dim);">' + esc(o.role) + ' · ' + (o.changelogCount || 0) + ' updates</span>' +
+              '</a>';
+            }).join('');
+          }
+        }
+      } catch (e) {
+        feedEl.innerHTML = '<div class="empty-history">Failed to load your feed.</div>';
+        if (orgsEl) orgsEl.innerHTML = '';
+      }
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>

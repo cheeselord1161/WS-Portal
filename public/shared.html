@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <!--FORKD_META-->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#030305;--surface:#0a0a0e;--surface2:#111116;--border:rgba(255,255,255,0.08);--accent:#fff;--brand-bg:var(--bg);--brand-accent:var(--accent);--brand-logo:'';--text:#f0f0f0;--text-muted:#9999aa;--text-dim:#555;--font-ui:'Inter',sans-serif;--font-mono:'SF Mono','Fira Code','IBM Plex Mono',monospace;--radius:12px;--radius-xl:16px}
+    .starred svg{fill:var(--accent);stroke:var(--accent)}.starred{color:var(--accent)!important;border-color:var(--accent)!important}.following{border-color:var(--accent)!important;color:var(--accent)!important}
+    html{scroll-behavior:smooth}
+    body{background:var(--brand-bg);color:var(--text);font-family:var(--font-ui);min-height:100vh;display:flex;flex-direction:column;align-items:center}
+    body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.02) 1px,transparent 1px);background-size:56px 56px;pointer-events:none;z-index:0}
+    .glow-orb{position:fixed;border-radius:50%;filter:blur(100px);pointer-events:none;z-index:0;opacity:0.6}
+    .glow-1{width:500px;height:500px;background:radial-gradient(circle,rgba(255,255,255,0.04) 0%,transparent 70%);top:-200px;left:-100px}
+    .container{width:100%;max-width:860px;padding:2rem;position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column}
+    nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 1.5rem;border-bottom:1px solid var(--border);margin-bottom:2rem}
+    .nav-left{display:flex;align-items:center;gap:12px}
+    .brand-logo-img{height:28px;width:auto;object-fit:contain;display:none}
+    .brand-logo-img.visible{display:block}
+    .brand-text{font-size:0.9rem;font-weight:700;letter-spacing:-0.02em;color:var(--brand-accent)}
+    .nav-right{display:flex;align-items:center;gap:12px}
+    .forkd-badge{font-family:var(--font-mono);font-size:0.65rem;color:var(--text-dim);background:var(--surface2);border:1px solid var(--border);padding:4px 10px;border-radius:6px;text-decoration:none;transition:all 0.15s}
+    .forkd-badge:hover{color:var(--text-muted);border-color:var(--border-hover)}
+    .loading-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:4rem 2rem}
+    .spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .loading-text{font-family:var(--font-mono);font-size:0.85rem;color:var(--text-muted)}
+    .error-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:4rem 2rem;text-align:center}
+    .error-icon{width:48px;height:48px;border-radius:50%;background:rgba(255,69,69,0.1);display:flex;align-items:center;justify-content:center;font-size:1.2rem}
+    .error-title{font-size:1.2rem;font-weight:700;color:var(--danger)}
+    .error-desc{font-family:var(--font-mono);font-size:0.85rem;color:var(--text-muted);max-width:340px;line-height:1.6}
+    .changelog-content{display:none;animation:fadeUp 0.4s ease}
+    .changelog-content.visible{display:block}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    .hidden{display:none!important}
+    .changelog-header{margin-bottom:2.5rem}
+    .changelog-title{font-size:clamp(1.5rem,4vw,2.2rem);font-weight:800;letter-spacing:-0.04em;line-height:1.1;margin-bottom:0.5rem;color:var(--brand-accent)}
+    .changelog-meta{display:flex;align-items:center;gap:1rem;font-family:var(--font-mono);font-size:0.75rem;color:var(--text-dim);flex-wrap:wrap}
+    .project-bar{display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.85rem;padding:0.6rem 0.9rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+    .project-bar-label{font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-dim)}
+    .project-bar-name{font-size:0.85rem;font-weight:700;color:var(--text);text-decoration:none}
+    .project-bar-name:hover{color:var(--brand-accent);text-decoration:underline}
+    .pill{font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);border:1px solid var(--border);border-radius:999px;padding:2px 8px;text-decoration:none}
+    .pill:hover{color:var(--text);border-color:var(--border-hover)}
+    .pill.warn{color:var(--warning);border-color:rgba(245,158,11,0.35)}
+    .source-note{font-family:var(--font-mono);font-size:0.68rem;color:var(--text-dim);line-height:1.7;margin-top:-1.5rem;margin-bottom:1.75rem}
+    .source-note a{color:var(--text-muted)}
+    .mini-btn{padding:0.3rem 0.75rem!important;font-size:0.72rem!important}
+    .changelog-meta .version{color:var(--text-muted);font-weight:600}
+    .changelog-meta .date{color:var(--text-dim)}
+    .changelog-body{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xl);padding:2rem;line-height:1.9;font-size:0.95rem;overflow-x:auto}
+    .changelog-body h2{font-size:1.05rem;font-weight:700;color:var(--brand-accent);margin:1.5rem 0 0.75rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border)}
+    .changelog-body h2:first-child{margin-top:0}
+    .changelog-body h3{font-size:0.95rem;font-weight:600;color:var(--text);margin:1rem 0 0.5rem}
+    .changelog-body p{margin-bottom:0.6rem;color:var(--text-muted);line-height:1.8}
+    .changelog-body ul,.changelog-body ol{padding-left:1.5rem;margin-bottom:0.8rem}
+    .changelog-body li{margin-bottom:0.4rem;color:var(--text-muted)}
+    .changelog-body code{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-family:var(--font-mono);font-size:0.8rem;color:var(--accent)}
+    .changelog-body pre{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:1rem;overflow-x:auto;margin-bottom:1rem}
+    .changelog-body pre code{background:none;border:none;padding:0;font-size:0.8rem;color:var(--text-muted)}
+    .changelog-body strong{color:var(--text)}
+    .changelog-body a{color:var(--brand-accent);text-decoration:underline}
+    .changelog-body blockquote{border-left:3px solid var(--brand-accent);padding-left:1rem;color:var(--text-muted);margin-bottom:1rem;font-style:italic}
+    .footer-actions{display:flex;align-items:center;justify-content:center;gap:1rem;margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid var(--border);flex-wrap:wrap}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:0.6rem 1.2rem;border-radius:var(--radius);font-family:var(--font-ui);font-size:0.85rem;font-weight:600;text-decoration:none;cursor:pointer;transition:all 0.15s;border:none}
+    .btn-ghost{background:var(--surface2);color:var(--text-muted);border:1px solid var(--border)}
+    .btn-ghost:hover{color:var(--text);border-color:var(--border-hover)}
+    .btn-primary{background:var(--brand-accent);color:var(--bg)}
+    .btn-primary:hover{transform:translateY(-1px)}
+    footer{width:100%;padding:2rem;text-align:center;font-family:var(--font-mono);font-size:0.68rem;color:var(--text-dim);border-top:1px solid var(--border);margin-top:auto}
+    footer a{color:var(--text-muted);text-decoration:none}
+    footer a:hover{color:var(--accent)}
+    @media(max-width:640px){.container{padding:1rem}.changelog-body{padding:1.25rem}.footer-actions{flex-direction:column}}
+  </style>
+</head>
+<body>
+<div class="glow-orb glow-1"></div>
+
+<div class="container">
+  <nav>
+    <div class="nav-left">
+      <img id="brandLogo" class="brand-logo-img" src="" alt="Brand logo"/>
+      <span class="brand-text" id="brandText">Forkd</span>
+    </div>
+    <div class="nav-right">
+      <a href="https://forkd-ai.com" class="forkd-badge">Powered by Forkd</a>
+    </div>
+  </nav>
+
+  <div class="loading-state" id="loadingState">
+    <div class="spinner"></div>
+    <div class="loading-text">Loading changelog…</div>
+  </div>
+
+  <div class="error-state" id="errorState" style="display:none;">
+    <div class="error-icon">!</div>
+    <div class="error-title">Changelog not found</div>
+    <div class="error-desc" id="errorDesc">This changelog may have been deleted or the link is invalid.</div>
+    <a href="https://forkd-ai.com" class="btn btn-primary">Create your own →</a>
+  </div>
+
+  <div class="changelog-content" id="changelogContent">
+    <div class="changelog-header">
+      <div class="project-bar hidden" id="projectBar">
+        <span class="project-bar-label">Project</span>
+        <a class="project-bar-name" id="projectNameLink" href="#"></a>
+        <span class="pill" id="projectCategoryTag"></span>
+        <a class="pill hidden" id="releaseSourceLink" target="_blank" rel="noopener">Source &#8599;</a>
+        <button class="btn btn-ghost mini-btn hidden" id="projectFollowBtn" onclick="toggleProjectFollow()"><span id="projectFollowText">Follow project</span></button>
+      </div>
+      <h1 class="changelog-title" id="changelogTitle">Changelog</h1>
+      <div class="changelog-meta">
+        <span class="version" id="changelogVersion"></span>
+        <span class="date" id="changelogDate"></span>
+      </div>
+      <div class="source-note" id="sourceNote"></div>
+    </div>
+    <div class="changelog-body" id="changelogBody"></div>
+    <div class="footer-actions">
+      <button class="btn btn-ghost" id="starBtn" onclick="toggleStar()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> <span id="starCount">0</span></button>
+      <button class="btn btn-ghost" id="followBtn" onclick="toggleFollow()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg> <span id="followText">Follow</span></button>
+      <button class="btn btn-ghost" onclick="copyChangelog()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button>
+      <button class="btn btn-ghost" onclick="downloadMarkdown()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download .md</button>
+      <a href="https://forkd-ai.com" class="btn btn-primary" style="background:var(--accent);color:#030305;">Generate your own →</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <a href="https://forkd-ai.com">Powered by Forkd — AI-powered changelog generation</a>
+</footer>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script>
+// Must match the Firebase project used by login/dashboard/generator, otherwise
+// the ID token this page sends is rejected by the API (star/follow would fail).
+const firebaseConfig = {
+  apiKey: "AIzaSyBu1N-awPnUjXAVqzWtCyhxTDBC-4QPNak",
+  authDomain: "changlelog-generator.firebaseapp.com",
+  projectId: "changlelog-generator",
+  storageBucket: "changlelog-generator.firebasestorage.app",
+  messagingSenderId: "640801556466",
+  appId: "1:640801556466:web:2bce80e0bab1021cc44d6b"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+let currentUser = null;
+auth.onAuthStateChanged(user => {
+  currentUser = user || null;
+  if (currentUser && window._projectSlug) checkProjectFollow();
+});
+
+const CHANGELOG_CACHE_KEY = 'forkd_shared_cache_';
+let _rawChangelogMarkdown = '';
+
+async function loadChangelog() {
+  window._shareId = window.location.pathname.split('/').filter(Boolean).pop();
+  const shareId = window._shareId;
+  if (!shareId || shareId === 'shared.html') {
+    showError('Invalid link. No changelog ID found.');
+    return;
+  }
+
+  const cached = sessionStorage.getItem(CHANGELOG_CACHE_KEY + shareId);
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      if (Date.now() - parsed.ts < 60000) {
+        window._changelogAuthorId = parsed.data.uid || null;
+        renderChangelog(parsed.data);
+        applyBrandingFromConfig(parsed.data);
+        loadProjectContext();
+        return;
+      }
+    } catch(e) {}
+  }
+
+  try {
+    const response = await fetch(`/shared-changelogs/${shareId}`);
+    if (!response.ok) {
+      if (response.status === 404) showError('This changelog was not found or has been deleted.');
+      else showError('Failed to load changelog. Please try again.');
+      return;
+    }
+
+    const data = await response.json();
+
+    // Store author uid for follow feature
+    window._changelogAuthorId = data.uid || null;
+
+    // Load star count and starred state
+    try {
+      const starRes = await fetch(`/api/changelogs/${shareId}/stars`);
+      if (starRes.ok) {
+        const starData = await starRes.json();
+        document.getElementById('starCount').textContent = starData.count || 0;
+      }
+      let starredHeaders = {};
+      if (currentUser) {
+        try { starredHeaders = { 'Authorization': 'Bearer ' + (await currentUser.getIdToken()) }; } catch(e) {}
+      }
+      const starredRes = await fetch(`/api/changelogs/${shareId}/starred`, { headers: starredHeaders });
+      if (starredRes.ok) {
+        const starredData = await starredRes.json();
+        if (starredData.starred) {
+          document.getElementById('starBtn').classList.add('starred');
+        }
+      }
+    } catch(e) {}
+
+    // Cache it
+    sessionStorage.setItem(CHANGELOG_CACHE_KEY + shareId, JSON.stringify({ data, ts: Date.now() }));
+    loadProjectContext();
+
+    try {
+      const brandResp = await fetch(`/shared-branding/${shareId}`);
+      if (brandResp.ok) {
+        const brandData = await brandResp.json();
+        applyBrandingFromConfig(brandData);
+      }
+    } catch(e) {}
+
+    renderChangelog(data);
+  } catch(err) {
+    console.error('Load error:', err);
+    showError('Network error. Please check your connection and try again.');
+  }
+}
+
+function renderChangelog(data) {
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('errorState').style.display = 'none';
+  const content = document.getElementById('changelogContent');
+  content.classList.add('visible');
+
+  _rawChangelogMarkdown = data.changelog || '';
+
+  document.getElementById('changelogTitle').textContent = data.title || 'Changelog';
+  document.getElementById('changelogVersion').textContent = data.version ? `v${data.version.replace(/^v/i, '')}` : '';
+  document.getElementById('changelogDate').textContent = data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+
+  const body = document.getElementById('changelogBody');
+  body.innerHTML = formatChangelog(_rawChangelogMarkdown);
+}
+
+function formatChangelog(text) {
+  if (!text) return '<p style="color:var(--text-dim);">No content.</p>';
+  
+  let html = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  const codeBlocks = [];
+  html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    const idx = codeBlocks.length;
+    codeBlocks.push(`<pre><code>${code.trim()}</code></pre>`);
+    return `%%CODEBLOCK_${idx}%%`;
+  });
+
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+  const lines = html.split('\n');
+  let result = '';
+  let inUl = false, inOl = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    const codeBlockMatch = trimmed.match(/^%%CODEBLOCK_(\d+)%%$/);
+    if (codeBlockMatch) {
+      if (inUl) { result += '</ul>'; inUl = false; }
+      if (inOl) { result += '</ol>'; inOl = false; }
+      result += codeBlocks[parseInt(codeBlockMatch[1])] + '\n';
+      continue;
+    }
+
+    const h2Match = trimmed.match(/^## (.+)$/);
+    const h1Match = trimmed.match(/^# (.+)$/);
+    if (h2Match || h1Match) {
+      if (inUl) { result += '</ul>'; inUl = false; }
+      if (inOl) { result += '</ol>'; inOl = false; }
+      result += `<h2>${h2Match ? h2Match[1] : h1Match[1]}</h2>\n`;
+      continue;
+    }
+
+    const bqMatch = trimmed.match(/^> (.+)$/);
+    if (bqMatch) {
+      if (inUl) { result += '</ul>'; inUl = false; }
+      if (inOl) { result += '</ol>'; inOl = false; }
+      result += `<blockquote>${bqMatch[1]}</blockquote>\n`;
+      continue;
+    }
+
+    if (/^---$/.test(trimmed) || /^\*\*\*$/.test(trimmed)) {
+      if (inUl) { result += '</ul>'; inUl = false; }
+      if (inOl) { result += '</ol>'; inOl = false; }
+      result += '<hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">\n';
+      continue;
+    }
+
+    const ulMatch = trimmed.match(/^- (.+)$/);
+    if (ulMatch) {
+      if (inOl) { result += '</ol>'; inOl = false; }
+      if (!inUl) { result += '<ul>'; inUl = true; }
+      result += `<li>${ulMatch[1]}</li>\n`;
+      continue;
+    }
+
+    const olMatch = trimmed.match(/^\d+\. (.+)$/);
+    if (olMatch) {
+      if (inUl) { result += '</ul>'; inUl = false; }
+      if (!inOl) { result += '<ol>'; inOl = true; }
+      result += `<li>${olMatch[1]}</li>\n`;
+      continue;
+    }
+
+    if (inUl) { result += '</ul>'; inUl = false; }
+    if (inOl) { result += '</ol>'; inOl = false; }
+
+    if (!trimmed) {
+      result += '\n';
+      continue;
+    }
+
+    const withLinks = trimmed.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    result += `<p>${withLinks}</p>\n`;
+  }
+
+  if (inUl) result += '</ul>';
+  if (inOl) result += '</ol>';
+
+  return result;
+}
+
+function applyBrandingFromConfig(brand) {
+  if (!brand) return;
+  const root = document.documentElement;
+  
+  if (brand.accentColor) root.style.setProperty('--brand-accent', brand.accentColor);
+  if (brand.bgColor) root.style.setProperty('--brand-bg', brand.bgColor);
+  if (brand.logoUrl) {
+    const logo = document.getElementById('brandLogo');
+    logo.src = brand.logoUrl;
+    logo.classList.add('visible');
+    document.getElementById('brandText').style.display = 'none';
+  }
+  if (brand.brandName) document.getElementById('brandText').textContent = brand.brandName;
+  if (brand.hideBranding) document.querySelector('.forkd-badge').style.display = 'none';
+}
+
+// ── Project context: attribution + follow-project ──
+function escAttr(s){ return String(s == null ? '' : s).replace(/"/g, '%22').replace(/</g, '%3C').replace(/>/g, '%3E'); }
+
+async function loadProjectContext() {
+  const shareId = window._shareId;
+  if (!shareId) return;
+  try {
+    const res = await fetch(`/api/releases/${encodeURIComponent(shareId)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const release = data.release || {};
+    const project = data.project || null;
+
+    const sourceNote = document.getElementById('sourceNote');
+    if (release.imported) {
+      sourceNote.innerHTML = 'Imported release — this note originally came from GitHub and was not authored by Forkd. ' +
+        (release.sourceUrl ? `<a href="${escAttr(release.sourceUrl)}" target="_blank" rel="noopener">View the original release</a>.` : '');
+    } else if (release.source === 'forkd') {
+      sourceNote.textContent = 'Drafted with the Forkd generator and published by its author.';
+    } else if (project) {
+      sourceNote.textContent = 'Published by the project on Forkd.';
+    }
+
+    if (release.sourceUrl) {
+      const link = document.getElementById('releaseSourceLink');
+      link.href = release.sourceUrl;
+      link.classList.remove('hidden');
+    }
+
+    if (!project) return;
+    window._projectSlug = project.slug;
+    const bar = document.getElementById('projectBar');
+    bar.classList.remove('hidden');
+    const nameLink = document.getElementById('projectNameLink');
+    nameLink.textContent = project.name;
+    nameLink.href = '/p/' + encodeURIComponent(project.slug);
+    document.getElementById('projectCategoryTag').textContent = String(project.category || 'other').replace(/-/g, ' ');
+    const followBtn = document.getElementById('projectFollowBtn');
+    followBtn.classList.remove('hidden');
+    followBtn.dataset.slug = project.slug;
+    checkProjectFollow();
+  } catch (err) {
+    console.error('Project context error:', err);
+  }
+}
+
+async function checkProjectFollow() {
+  const slug = window._projectSlug;
+  if (!slug || !currentUser) return;
+  try {
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/following/check`, { headers: { Authorization: 'Bearer ' + idToken } });
+    const data = await res.json();
+    setProjectFollowState(!!data.following);
+  } catch (e) {}
+}
+
+function setProjectFollowState(following) {
+  const btn = document.getElementById('projectFollowBtn');
+  if (!btn) return;
+  btn.classList.toggle('following', following);
+  document.getElementById('projectFollowText').textContent = following ? 'Following' : 'Follow project';
+}
+
+async function toggleProjectFollow() {
+  const slug = window._projectSlug;
+  if (!slug) return;
+  if (!currentUser) {
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 100));
+      if (currentUser) break;
+    }
+    if (!currentUser) { window.location.href = '/login.html'; return; }
+  }
+  try {
+    const idToken = await currentUser.getIdToken();
+    const following = document.getElementById('projectFollowBtn').classList.contains('following');
+    const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/follow`, {
+      method: following ? 'DELETE' : 'POST',
+      headers: { Authorization: `Bearer ${idToken}` },
+    });
+    if (!res.ok) { alert('Could not update follow. Please try again.'); return; }
+    const data = await res.json();
+    setProjectFollowState(!!data.following);
+  } catch (e) { console.error('Follow project error:', e); }
+}
+
+function showError(msg) {
+  document.getElementById('loadingState').style.display = 'none';
+  const err = document.getElementById('errorState');
+  err.style.display = 'flex';
+  document.getElementById('errorDesc').textContent = msg || 'This changelog may have been deleted or the link is invalid.';
+}
+
+// ── Star / Unstar ──
+let starBusy = false;
+async function toggleStar() {
+  const btn = document.getElementById('starBtn');
+  if (!window._shareId || starBusy) return;
+  if (!currentUser) {
+    // Wait for auth to resolve before redirecting
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 100));
+      if (currentUser) break;
+    }
+    if (!currentUser) { alert('Please log in to star changelogs.'); return; }
+  }
+  starBusy = true;
+  btn.disabled = true;
+  try {
+    const idToken = await currentUser.getIdToken();
+    const starred = btn.classList.contains('starred');
+    const res = await fetch(`/api/changelogs/${window._shareId}/star`, {
+      method: starred ? 'DELETE' : 'POST',
+      headers: { 'Authorization': `Bearer ${idToken}` }
+    });
+    if (res.ok) {
+      // Render the server's authoritative count so the display never drifts.
+      const data = await res.json();
+      btn.classList.toggle('starred', !!data.starred);
+      document.getElementById('starCount').textContent = data.count != null ? data.count : 0;
+    }
+  } catch(e) { console.error('Star error:', e); }
+  finally { starBusy = false; btn.disabled = false; }
+}
+
+// ── Follow / Unfollow ──
+async function toggleFollow() {
+  if (!window._changelogAuthorId) return;
+  if (!currentUser) {
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 100));
+      if (currentUser) break;
+    }
+    if (!currentUser) { alert('Please log in to follow users.'); return; }
+  }
+  try {
+    const idToken = await currentUser.getIdToken();
+    const following = document.getElementById('followBtn').classList.contains('following');
+    const res = await fetch(`/api/users/${window._changelogAuthorId}/follow`, {
+      method: following ? 'DELETE' : 'POST',
+      headers: { 'Authorization': `Bearer ${idToken}` }
+    });
+    if (res.ok) {
+      document.getElementById('followBtn').classList.toggle('following');
+      document.getElementById('followText').textContent = following ? 'Follow' : 'Following';
+    }
+  } catch(e) { console.error('Follow error:', e); }
+}
+
+function copyChangelog() {
+  const text = document.getElementById('changelogBody').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.footer-actions button:nth-child(3)');
+    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy';
+  }).catch(() => {
+    alert('Failed to copy. Select the text manually.');
+  });
+}
+
+function downloadMarkdown() {
+  const title = document.getElementById('changelogTitle').textContent || 'changelog';
+  const version = document.getElementById('changelogVersion').textContent || '';
+  const date = document.getElementById('changelogDate').textContent || '';
+  const shareId = window._shareId;
+  
+  fetch(`/shared-changelogs/${shareId}`)
+    .then(r => r.json())
+    .then(data => {
+      const md = `# ${title}${version ? ' ' + version : ''}\n${date ? '*Published ' + date + '*' : ''}\n\n${data.changelog || ''}`;
+      const blob = new Blob([md], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${title.toLowerCase().replace(/\s+/g, '-')}-${version || 'changelog'}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    })
+    .catch(() => {
+      alert('Failed to download. Try copying instead.');
+    });
+}
+
+document.addEventListener('DOMContentLoaded', loadChangelog);
+</script>
+</body>
+</html>

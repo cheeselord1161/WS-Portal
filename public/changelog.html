@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<!--FORKD_META-->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#030305;--surface:#0a0a0e;--surface2:#111116;--surface3:#18181d;--border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.14);--accent:#fff;--accent-dim:rgba(255,255,255,0.08);--text:#f0f0f0;--text-muted:#9999aa;--text-dim:#555;--danger:#ff4545;--success:#28c840;--warning:#f59e0b;--font-ui:'Inter',sans-serif;--font-mono:'SF Mono','Fira Code','IBM Plex Mono',monospace;--radius:8px;--radius-lg:12px;--radius-xl:16px}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font-ui);min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.02) 1px,transparent 1px);background-size:56px 56px;pointer-events:none;z-index:0}
+.glow-orb{position:fixed;border-radius:50%;filter:blur(100px);pointer-events:none;z-index:0;opacity:.6}
+.glow-1{width:500px;height:500px;background:radial-gradient(circle,rgba(255,255,255,0.04) 0%,transparent 70%);top:-200px;left:-100px}
+nav{display:flex;justify-content:center;padding:14px 20px;position:sticky;top:0;z-index:100;background:rgba(3,3,5,.85);backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
+.nav-inner{width:100%;max-width:860px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.logo{display:flex;align-items:center;gap:10px;font-size:.95rem;font-weight:800;letter-spacing:-.03em;text-decoration:none;color:var(--text)}
+.logo-img{height:22px;width:auto}
+.nav-links{display:flex;align-items:center;gap:12px}
+.nav-link{font-size:.82rem;font-weight:500;color:var(--text-muted);text-decoration:none;transition:color .15s}
+.nav-link:hover{color:var(--text)}
+.container{max-width:860px;margin:0 auto;padding:2rem;position:relative;z-index:1}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.loading-state{padding:4rem 2rem;display:flex;justify-content:center}
+.spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hidden{display:none!important}
+.error-state{padding:4rem 2rem;text-align:center;border:1px dashed var(--border);border-radius:var(--radius-xl);font-family:var(--font-mono);font-size:.85rem;color:var(--text-muted)}
+.changelog-content{animation:fadeUp .35s ease}
+.attribution{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin-bottom:1rem;padding:.7rem 1rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg)}
+.attribution-avatar{width:30px;height:30px;border-radius:8px;object-fit:cover;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;color:var(--accent);flex-shrink:0}
+.attribution-label{font-family:var(--font-mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim)}
+.attribution-name{font-size:.88rem;font-weight:700;color:var(--text);text-decoration:none}
+.attribution-name:hover{color:var(--accent);text-decoration:underline}
+.attribution .spacer{flex:1}
+.badge{font-family:var(--font-mono);font-size:.62rem;font-weight:600;padding:3px 8px;border-radius:5px;background:var(--accent-dim);color:var(--text-muted);border:1px solid var(--border);text-decoration:none;white-space:nowrap}
+.changelog-title{font-size:clamp(1.6rem,4.5vw,2.5rem);font-weight:900;letter-spacing:-.04em;line-height:1.12;margin-bottom:.6rem}
+.changelog-meta{display:flex;gap:1rem;flex-wrap:wrap;font-family:var(--font-mono);font-size:.72rem;color:var(--text-dim);margin-bottom:1rem}
+.changelog-meta .ver{color:var(--text-muted);font-weight:700}
+.tag-list{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1.5rem}
+.tag{font-family:var(--font-mono);font-size:.65rem;color:var(--text-dim);border:1px solid var(--border);border-radius:999px;padding:3px 9px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:.6rem 1.2rem;border-radius:var(--radius-lg);font-family:var(--font-ui);font-size:.82rem;font-weight:600;text-decoration:none;cursor:pointer;transition:all .15s;border:none}
+.btn-primary{background:var(--accent);color:#030305}
+.btn-primary:hover{transform:translateY(-1px)}
+.btn-ghost{background:var(--surface2);color:var(--text-muted);border:1px solid var(--border)}
+.btn-ghost:hover{color:var(--text);border-color:var(--border-hover)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.following{border-color:var(--accent)!important;color:var(--accent)!important}
+.starred{border-color:var(--accent)!important;color:var(--accent)!important}
+.changelog-body{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xl);padding:2.25rem;line-height:1.9;font-size:.95rem;overflow-x:auto}
+.changelog-body h1,.changelog-body h2{font-size:1.05rem;font-weight:700;color:var(--accent);margin:1.6rem 0 .75rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+.changelog-body h1:first-child,.changelog-body h2:first-child{margin-top:0}
+.changelog-body h3{font-size:.95rem;font-weight:600;margin:1rem 0 .5rem}
+.changelog-body p{margin-bottom:.75rem;color:var(--text-muted);line-height:1.85}
+.changelog-body ul,.changelog-body ol{padding-left:1.5rem;margin-bottom:.9rem}
+.changelog-body li{margin-bottom:.45rem;color:var(--text-muted)}
+.changelog-body code{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-family:var(--font-mono);font-size:.8rem;color:var(--accent)}
+.changelog-body pre{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:1rem;overflow-x:auto;margin-bottom:1rem}
+.changelog-body pre code{background:none;border:none;padding:0}
+.changelog-body strong{color:var(--text)}
+.changelog-body a{color:var(--accent);text-decoration:underline}
+.changelog-body blockquote{border-left:3px solid var(--accent);padding-left:1rem;color:var(--text-muted);margin-bottom:1rem;font-style:italic}
+.actions{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:1.75rem;padding-top:1.5rem;border-top:1px solid var(--border)}
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border-hover);color:var(--text);font-size:.8rem;padding:.7rem 1.2rem;border-radius:var(--radius-lg);z-index:200;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+footer{text-align:center;padding:2rem;font-family:var(--font-mono);font-size:.65rem;color:var(--text-dim);border-top:1px solid var(--border);margin-top:2rem;position:relative;z-index:1}
+footer a{color:var(--text-muted);text-decoration:none}
+@media(max-width:640px){.container{padding:1rem}.changelog-body{padding:1.25rem}.actions .btn{width:100%;justify-content:center}}
+</style>
+<link rel="stylesheet" href="/forkd-theme.css">
+</head>
+<body>
+<div class="glow-orb glow-1"></div>
+
+<nav><div class="nav-inner">
+  <a href="/" class="logo"><img src="logo.png" alt="" class="logo-img">Forkd</a>
+  <div class="nav-links">
+    <a href="/discover" class="nav-link">Discover</a>
+    <a href="/publish" class="nav-link">Publish</a>
+    <span id="auth-slot"></span>
+  </div>
+</div></nav>
+
+<div class="container">
+  <div class="loading-state" id="loadingState"><div class="spinner"></div></div>
+
+  <div class="error-state hidden" id="errorState">
+    <div style="font-size:1.6rem;margin-bottom:.6rem;">?</div>
+    <div style="font-weight:700;font-size:1rem;color:var(--text);margin-bottom:.4rem;">Changelog not found</div>
+    <div id="errorDesc" style="margin-bottom:1.25rem;">This changelog may have been deleted or the link is invalid.</div>
+    <a href="/discover" class="btn btn-primary">Browse changelogs</a>
+  </div>
+
+  <div class="changelog-content hidden" id="changelogContent">
+    <div class="attribution" id="attribution">
+      <div class="attribution-avatar" id="authorAvatar">F</div>
+      <div>
+        <div class="attribution-label" id="authorLabel">Published by</div>
+        <a class="attribution-name" id="authorLink" href="#">Anonymous</a>
+      </div>
+      <div class="spacer"></div>
+      <span class="badge" id="categoryBadge" style="display:none;"></span>
+      <button class="btn btn-ghost" id="followBtn" onclick="toggleFollow()" style="padding:.4rem .9rem;font-size:.76rem;">
+        <span id="followText">Follow</span>
+      </button>
+    </div>
+
+    <h1 class="changelog-title" id="changelogTitle">Changelog</h1>
+    <div class="changelog-meta">
+      <span class="ver" id="changelogVersion"></span>
+      <span id="changelogDate"></span>
+      <span id="viewCount"></span>
+    </div>
+    <div class="tag-list" id="tagList"></div>
+
+    <div class="changelog-body" id="changelogBody"></div>
+
+    <div class="actions">
+      <button class="btn btn-ghost" id="starBtn" onclick="toggleStar()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <span id="starCount">0</span>
+      </button>
+      <button class="btn btn-ghost" id="copyBtn" onclick="copyBody()">Copy</button>
+      <button class="btn btn-ghost" id="shareBtn" onclick="shareLink()">Share</button>
+      <a class="btn btn-primary" href="/publish">Publish yours</a>
+    </div>
+  </div>
+</div>
+
+<footer><a href="/">Forkd</a> — publish, discover, and follow software changelogs</footer>
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBu1N-awPnUjXAVqzWtCyhxTDBC-4QPNak",
+  authDomain: "changlelog-generator.firebaseapp.com",
+  projectId: "changlelog-generator",
+  storageBucket: "changlelog-generator.firebasestorage.app",
+  messagingSenderId: "640801556466",
+  appId: "1:640801556466:web:2bce80e0bab1021cc44d6b"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+
+let currentUser = null;
+let release = null;
+let organization = null;
+let isFollowing = false;
+
+function esc(s){ const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(window._tt); window._tt = setTimeout(() => t.classList.remove('show'), 2200); }
+function timeAgo(d){
+  if (!d) return '';
+  const n = Date.now() - new Date(d).getTime(), m = Math.floor(n/60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + 'm ago';
+  const h = Math.floor(m/60); if (h < 24) return h + 'h ago';
+  const days = Math.floor(h/24); if (days < 7) return days + 'd ago';
+  return new Date(d).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+}
+
+auth.onAuthStateChanged(user => {
+  currentUser = user || null;
+  renderAuthSlot();
+});
+
+function renderAuthSlot(){
+  const slot = document.getElementById('auth-slot');
+  if (!slot) return;
+  if (currentUser) slot.innerHTML = '<a href="/dashboard.html" class="nav-link">' + esc(currentUser.displayName || 'Dashboard') + '</a>';
+  else slot.innerHTML = '<a href="/login.html" class="nav-link">Sign in</a>';
+}
+
+// Minimal, dependency-free markdown renderer (matches the shared changelog page).
+function formatChangelog(text){
+  if (!text) return '<p style="color:var(--text-dim);">No content.</p>';
+  let html = String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const codeBlocks = [];
+  html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    const idx = codeBlocks.length;
+    codeBlocks.push('<pre><code>' + code.trim() + '</code></pre>');
+    return '%%CODEBLOCK_' + idx + '%%';
+  });
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+  const lines = html.split('\n');
+  let result = '', inUl = false, inOl = false;
+  const closeLists = () => { if (inUl) { result += '</ul>'; inUl = false; } if (inOl) { result += '</ol>'; inOl = false; } };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    const cb = line.match(/^%%CODEBLOCK_(\d+)%%$/);
+    if (cb) { closeLists(); result += codeBlocks[parseInt(cb[1], 10)] + '\n'; continue; }
+    const heading = line.match(/^#{1,3} (.+)$/);
+    if (heading) { closeLists(); result += '<h2>' + heading[1] + '</h2>\n'; continue; }
+    const bq = line.match(/^> (.+)$/);
+    if (bq) { closeLists(); result += '<blockquote>' + bq[1] + '</blockquote>\n'; continue; }
+    if (/^(---|\*\*\*)$/.test(line)) { closeLists(); result += '<hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">\n'; continue; }
+    const ul = line.match(/^[-*+] (.+)$/);
+    if (ul) { if (inOl) { result += '</ol>'; inOl = false; } if (!inUl) { result += '<ul>'; inUl = true; } result += '<li>' + ul[1] + '</li>\n'; continue; }
+    const ol = line.match(/^\d+\. (.+)$/);
+    if (ol) { if (inUl) { result += '</ul>'; inUl = false; } if (!inOl) { result += '<ol>'; inOl = true; } result += '<li>' + ol[1] + '</li>\n'; continue; }
+    closeLists();
+    if (!line) { result += '\n'; continue; }
+    const withLinks = line.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    result += '<p>' + withLinks + '</p>\n';
+  }
+  closeLists();
+  return result;
+}
+
+async function loadChangelog(){
+  const key = window.location.pathname.split('/').filter(Boolean).pop();
+  if (!key || key === 'changelog.html') { showError('Invalid link. No changelog ID found.'); return; }
+  try {
+    const res = await fetch('/api/changelogs/' + encodeURIComponent(key));
+    if (!res.ok) { showError(res.status === 404 ? 'This changelog was not found or is not public.' : 'Failed to load this changelog.'); return; }
+    const data = await res.json();
+    release = data.release;
+    organization = data.organization;
+    isFollowing = !!data.isFollowing;
+    render();
+    checkStar();
+  } catch (err) {
+    showError('Network error. Please check your connection and try again.');
+  }
+}
+
+function showError(msg){
+  document.getElementById('loadingState').classList.add('hidden');
+  document.getElementById('errorState').classList.remove('hidden');
+  document.getElementById('errorDesc').textContent = msg;
+}
+
+function render(){
+  document.getElementById('loadingState').classList.add('hidden');
+  document.getElementById('changelogContent').classList.remove('hidden');
+
+  document.title = release.title + (release.version ? ' ' + release.version : '') + ' · Forkd';
+
+  // Attribution: organization if the changelog belongs to one, otherwise the author.
+  const avatar = document.getElementById('authorAvatar');
+  const link = document.getElementById('authorLink');
+  const label = document.getElementById('authorLabel');
+  if (release.orgSlug) {
+    label.textContent = 'Published by organization';
+    link.textContent = release.orgName || release.orgSlug;
+    link.href = '/org/' + encodeURIComponent(release.orgSlug);
+    if (organization && organization.avatarUrl) {
+      avatar.outerHTML = '<img class="attribution-avatar" id="authorAvatar" src="' + esc(organization.avatarUrl) + '" alt="" referrerpolicy="no-referrer"/>';
+    } else {
+      avatar.textContent = (release.orgName || release.orgSlug).charAt(0).toUpperCase();
+    }
+  } else {
+    label.textContent = 'Published by';
+    link.textContent = release.author || 'Anonymous';
+    link.href = release.authorUsername ? ('/@' + encodeURIComponent(release.authorUsername)) : ('/u/' + encodeURIComponent(release.authorId));
+    avatar.textContent = (release.author || 'A').charAt(0).toUpperCase();
+  }
+
+  const categoryBadge = document.getElementById('categoryBadge');
+  if (release.category && release.category !== 'other') {
+    categoryBadge.style.display = '';
+    categoryBadge.textContent = String(release.category).replace(/-/g, ' ');
+  }
+
+  document.getElementById('changelogTitle').textContent = release.title;
+  document.getElementById('changelogVersion').textContent = release.version || '';
+  document.getElementById('changelogDate').textContent = 'Published ' + timeAgo(release.publishedAt || release.createdAt);
+  document.getElementById('viewCount').textContent = (release.views || 0) + ' views';
+  document.getElementById('starCount').textContent = release.stars || 0;
+  document.getElementById('changelogBody').innerHTML = formatChangelog(release.changelog);
+
+  document.getElementById('tagList').innerHTML = (release.tags || []).map(t => '<span class="tag">' + esc(t) + '</span>').join('');
+
+  setFollowState(isFollowing);
+}
+
+function setFollowState(following){
+  isFollowing = following;
+  const btn = document.getElementById('followBtn');
+  btn.classList.toggle('following', following);
+  document.getElementById('followText').textContent = following ? 'Following' : 'Follow';
+}
+
+function followPath(){
+  if (release.orgSlug) return '/api/orgs/' + encodeURIComponent(release.orgSlug) + '/follow';
+  return '/api/users/' + encodeURIComponent(release.authorId) + '/follow';
+}
+
+async function toggleFollow(){
+  if (!currentUser) { window.location.href = '/login.html'; return; }
+  try {
+    const token = await currentUser.getIdToken();
+    const res = await fetch(followPath(), { method: isFollowing ? 'DELETE' : 'POST', headers: { Authorization: 'Bearer ' + token } });
+    if (res.status === 401) { window.location.href = '/login.html'; return; }
+    if (!res.ok) { toast('Could not update follow. Try again.'); return; }
+    const data = await res.json();
+    setFollowState(!!data.following);
+    toast(data.following ? 'Following' : 'Unfollowed');
+  } catch (e) { toast('Could not update follow. Try again.'); }
+}
+
+async function checkStar(){
+  try {
+    if (!currentUser) return;
+    const token = await currentUser.getIdToken();
+    const res = await fetch('/api/changelogs/' + encodeURIComponent(release.id) + '/starred', { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.starred) document.getElementById('starBtn').classList.add('starred');
+  } catch (e) { /* star state is optional */ }
+}
+
+let starBusy = false;
+async function toggleStar(){
+  if (starBusy) return; // ignore clicks while a star request is in flight
+  if (!currentUser) { window.location.href = '/login.html'; return; }
+  const btn = document.getElementById('starBtn');
+  starBusy = true;
+  btn.disabled = true;
+  try {
+    const token = await currentUser.getIdToken();
+    const starred = btn.classList.contains('starred');
+    const res = await fetch('/api/changelogs/' + encodeURIComponent(release.id) + '/star', { method: starred ? 'DELETE' : 'POST', headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) { toast('Could not update star.'); return; }
+    // Render the server's authoritative count so the display never drifts.
+    const data = await res.json();
+    btn.classList.toggle('starred', !!data.starred);
+    document.getElementById('starCount').textContent = data.count != null ? data.count : 0;
+  } catch (e) { toast('Could not update star.'); }
+  finally { starBusy = false; btn.disabled = false; }
+}
+
+function copyBody(){
+  const text = document.getElementById('changelogBody').innerText;
+  navigator.clipboard.writeText(text).then(() => toast('Copied')).catch(() => toast('Select the text and copy manually.'));
+}
+
+function shareLink(){
+  const url = window.location.href;
+  if (navigator.share) { navigator.share({ title: release.title, url }).catch(() => {}); return; }
+  navigator.clipboard.writeText(url).then(() => toast('Link copied')).catch(() => toast(url));
+}
+
+document.addEventListener('DOMContentLoaded', loadChangelog);
+</script>
+</body>
+</html>

@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Forkd AI — Generate changelogs from git commits</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #030303; --surface: #0a0a0a; --surface2: #121212; --surface3: #1a1a1a;
+      --border: rgba(255,255,255,0.1); --border-hover: rgba(255,255,255,0.2);
+      --accent: #ffffff; --accent-dim: rgba(255,255,255,0.12);
+      --text: #f0f0f0; --text-muted: #888888; --text-dim: #444444;
+      --danger: #ff4545; --warning: #f59e0b; --success: #28c840;
+      --font-ui: 'Inter', sans-serif; --font-mono: 'IBM Plex Mono', monospace;
+      --radius: 8px; --radius-lg: 12px;
+    }
+    body.light-mode {
+      --bg: #ffffff; --surface: #f5f5f5; --surface2: #eeeeee; --surface3: #e5e5e5;
+      --border: rgba(0,0,0,0.1); --border-hover: rgba(0,0,0,0.2);
+      --accent: #000000; --accent-dim: rgba(0,0,0,0.12);
+      --text: #0f0f0f; --text-muted: #777777; --text-dim: #bbbbbb;
+    }
+    body.no-animations, body.no-animations * { animation: none !important; transition: none !important; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-ui); min-height: 100vh; display: flex; flex-direction: column; }
+
+    @keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+    @keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+    @keyframes shimmer { 0% { background-position:-200% 0; } 100% { background-position:200% 0; } }
+    @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.85); } }
+    @keyframes progressPulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+    /* NAV */
+    nav { animation: fadeIn 0.4s ease both; display:flex; align-items:center; justify-content:space-between; padding:1.5rem 2.5rem; border-bottom:1px solid var(--border); }
+    .logo { display:flex; align-items:center; gap:12px; font-size:1.1rem; font-weight:700; letter-spacing:-0.02em; cursor:pointer; }
+    .logo-img { height:24px; width:auto; object-fit:contain; }
+    .badge { font-family:var(--font-mono); font-size:0.65rem; padding:3px 8px; border-radius:4px; background:var(--accent-dim); color:var(--accent); letter-spacing:0.05em; }
+    .nav-container { display:flex; justify-content:space-between; align-items:center; width:100%; max-width:1200px; margin:0 auto; }
+    .user-profile-nav { transition:all 0.2s ease; }
+    .user-profile-nav:hover { border-color:var(--accent) !important; background:var(--surface3) !important; }
+
+    /* HERO */
+    .hero { animation: fadeUp 0.5s ease 0.1s both; text-align:center; padding:3.5rem 2rem 2.5rem; }
+    .hero h1 { font-size:clamp(2rem,5vw,3.2rem); font-weight:700; letter-spacing:-0.04em; line-height:1.1; margin-bottom:1rem; }
+    .hero h1 span { color:var(--accent); }
+    .hero p { color:var(--text-muted); font-size:1.05rem; max-width:480px; margin:0 auto; line-height:1.7; }
+
+    /* TOOLBAR */
+    .toolbar { animation: fadeUp 0.5s ease 0.15s both; display:flex; align-items:center; gap:1rem; max-width:1100px; width:100%; margin:0 auto; padding:0 2rem 1.5rem; flex-wrap:wrap; }
+    .field { display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:0.6rem 1rem; transition:border-color 0.15s; }
+    .field:focus-within { border-color:var(--border-hover); }
+    .field-label { font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted); white-space:nowrap; font-weight:500; }
+    .field input { background:transparent; border:none; outline:none; color:var(--text); font-family:var(--font-mono); font-size:0.85rem; }
+    .field input[type="text"] { width:90px; }
+    .field input[type="date"] { width:130px; color-scheme:dark; }
+    .field-github { flex:1; min-width:220px; }
+    .field-github input { width:100%; }
+    .field-github input::placeholder { color:var(--text-dim); }
+    .github-status { font-family:var(--font-mono); font-size:0.72rem; color:var(--text-dim); display:none; align-items:center; gap:6px; }
+    .github-status.visible { display:flex; }
+    .github-status.loading { color:var(--accent); }
+    .github-status.error { color:var(--danger); }
+    .spin { display:inline-block; animation:spin 0.8s linear infinite; }
+
+    /* LANGUAGE SELECTOR */
+    .lang-select { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:0.6rem 1rem; color:var(--text); font-family:var(--font-mono); font-size:0.8rem; outline:none; cursor:pointer; transition:border-color 0.15s; }
+    .lang-select:hover { border-color:var(--border-hover); }
+
+    /* SECTIONS BAR */
+    .sections-bar { animation: fadeUp 0.5s ease 0.2s both; max-width:1100px; width:100%; margin:0 auto; padding:0 2rem 1.75rem; }
+    .sections-toggle { display:flex; align-items:center; gap:10px; cursor:pointer; width:fit-content; font-size:0.8rem; font-family:var(--font-mono); color:var(--text-muted); transition:color 0.15s; user-select:none; font-weight:600; }
+    .sections-toggle:hover { color:var(--accent); }
+    .sections-toggle .arrow { display:inline-block; transition:transform 0.2s; font-size:0.6rem; }
+    .sections-toggle.open .arrow { transform:rotate(90deg); }
+    .sections-editor { display:none; margin-top:1.2rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.5rem 1.5rem; }
+    .sections-editor.visible { display:block; animation:fadeIn 0.2s ease; }
+    .sections-editor p { font-size:0.78rem; color:var(--text-muted); margin-bottom:1rem; font-family:var(--font-mono); line-height:1.6; }
+    .sections-list { display:flex; flex-wrap:wrap; gap:0.8rem; margin-bottom:1rem; }
+    .section-chip { display:flex; align-items:center; gap:8px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:6px 12px; cursor:grab; transition:all 0.15s; user-select:none; }
+    .section-chip:hover { border-color:var(--border-hover); }
+    .section-chip.dragging { opacity:0.4; }
+    .section-chip.drag-over { border-color:var(--accent); background:var(--accent-dim); }
+    .section-chip-name { font-family:var(--font-mono); font-size:0.8rem; color:var(--text); border:none; outline:none; background:transparent; width:130px; cursor:text; font-weight:500; }
+    .section-chip-remove { background:none; border:none; cursor:pointer; color:var(--text-muted); font-size:0.9rem; line-height:1; padding:0 2px; transition:color 0.15s; font-weight:700; }
+    .section-chip-remove:hover { color:var(--danger); }
+    .sections-actions { display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; }
+    .add-section-input { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-family:var(--font-mono); font-size:0.8rem; color:var(--text); outline:none; width:160px; transition:border-color 0.15s; }
+    .add-section-input:focus { border-color:var(--border-hover); }
+    .add-section-input::placeholder { color:var(--text-muted); }
+
+    /* TEMPLATES BAR */
+    .templates-bar { max-width:1100px; width:100%; margin:0 auto; padding:0 2rem 1.5rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap; }
+    .template-btn { font-family:var(--font-mono); font-size:0.75rem; padding:6px 14px; border-radius:6px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.15s; }
+    .template-btn:hover { border-color:var(--border-hover); color:var(--text-muted); background:var(--surface2); }
+    .template-btn.active { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+    .templates-label { font-family:var(--font-mono); font-size:0.8rem; color:var(--text-muted); font-weight:600; }
+
+    /* BATCH BAR (Pro) */
+    .batch-bar { max-width:1100px; width:100%; margin:0 auto; padding:0 2rem 1.5rem; }
+    .batch-toggle { display:flex; align-items:center; gap:10px; cursor:pointer; font-size:0.8rem; font-family:var(--font-mono); color:var(--text-muted); transition:color 0.15s; user-select:none; width:fit-content; font-weight:600; }
+    .batch-toggle:hover { color:var(--accent); }
+    .batch-toggle .arrow { display:inline-block; transition:transform 0.2s; font-size:0.6rem; }
+    .batch-toggle.open .arrow { transform:rotate(90deg); }
+    .batch-editor { display:none; margin-top:1.2rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.5rem 1.5rem; }
+    .batch-editor.visible { display:block; animation:fadeIn 0.2s ease; }
+    .batch-editor p { font-size:0.78rem; color:var(--text-muted); margin-bottom:1rem; font-family:var(--font-mono); line-height:1.6; }
+    .batch-repos { display:flex; flex-direction:column; gap:0.8rem; margin-bottom:1rem; }
+    .batch-repo-row { display:flex; gap:0.75rem; align-items:center; }
+    .batch-repo-input { flex:1; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-family:var(--font-mono); font-size:0.85rem; color:var(--text); outline:none; transition:border-color 0.15s; }
+    .batch-repo-input:focus { border-color:var(--border-hover); }
+    .batch-repo-input::placeholder { color:var(--text-muted); }
+    .batch-status { font-family:var(--font-mono); font-size:0.8rem; padding:3px 10px; border-radius:4px; font-weight:600; }
+    .batch-status.done { color:var(--success); background:rgba(40,200,64,0.1); }
+    .batch-status.error { color:var(--danger); background:rgba(255,69,69,0.1); }
+    .batch-status.running { color:var(--warning); animation:progressPulse 1s infinite; }
+
+    /* MAIN PANELS */
+    main { flex:1; display:grid; grid-template-columns:1fr 1fr; gap:2rem; padding:0 2rem 2rem; max-width:1100px; width:100%; margin:0 auto; }
+    .github-sidebar-container { max-width:100%; }
+    @media(max-width:720px) { main{grid-template-columns:1fr;padding:0 1rem 1.5rem;} .toolbar,.sections-bar,.templates-bar,.batch-bar,.history-bar{padding-left:1rem;padding-right:1rem;} nav{padding:1rem;} .hero{padding:2rem 1rem 1.25rem;} }
+    .panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); display:flex; flex-direction:column; overflow:hidden; transition:border-color 0.2s; }
+    .panel:focus-within { border-color:rgba(255,255,255,0.12); }
+    .panel-header { display:flex; align-items:center; justify-content:space-between; padding:1.1rem 1.5rem; border-bottom:1px solid var(--border); }
+    .panel-title { font-size:0.8rem; font-family:var(--font-mono); color:var(--text-muted); letter-spacing:0.08em; text-transform:uppercase; font-weight:600; }
+    .header-actions { display:flex; align-items:center; gap:6px; }
+    textarea { flex:1; background:transparent; border:none; outline:none; resize:none; color:var(--text); font-family:var(--font-mono); font-size:0.9rem; line-height:1.8; padding:1.5rem; min-height:320px; }
+    textarea::placeholder { color:var(--text-dim); }
+    .panel-footer { padding:1.2rem 1.5rem; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:1.2rem; flex-wrap:wrap; }
+    .footer-left,.footer-right { display:flex; align-items:center; gap:0.75rem; }
+    .commit-counter { font-family:var(--font-mono); font-size:0.78rem; color:var(--text-muted); font-weight:500; }
+    .commit-counter.warn { color:var(--warning); }
+    .commit-counter.danger { color:var(--danger); }
+
+    /* LOADING / PROGRESS */
+    .loading-bar { height:2px; background:linear-gradient(90deg,transparent,var(--accent),transparent); background-size:200% 100%; animation:shimmer 1.2s infinite; display:none; }
+    .loading .loading-bar { display:block; }
+    .progress-overlay { display:none; position:absolute; inset:0; background:rgba(10,10,10,0.85); z-index:10; flex-direction:column; align-items:center; justify-content:center; gap:1rem; border-radius:var(--radius-lg); }
+    .progress-overlay.visible { display:flex; animation:fadeIn 0.2s ease; }
+    .panel { position:relative; }
+    .progress-steps { display:flex; flex-direction:column; gap:0.5rem; width:200px; }
+    .progress-step { display:flex; align-items:center; gap:12px; font-family:var(--font-mono); font-size:0.82rem; color:var(--text-muted); transition:color 0.3s; }
+    .progress-step.active { color:var(--accent); }
+    .progress-step.done { color:var(--success); }
+    .progress-step-dot { width:8px; height:8px; border-radius:50%; background:var(--text-dim); flex-shrink:0; transition:background 0.3s; }
+    .progress-step.active .progress-step-dot { background:var(--accent); animation:pulse 1s infinite; }
+    .progress-step.done .progress-step-dot { background:var(--success); }
+    .progress-label { font-family:var(--font-mono); font-size:0.85rem; color:var(--text-muted); animation:progressPulse 1.5s ease-in-out infinite; font-weight:500; }
+
+    /* BUTTONS */
+    .btn { display:inline-flex; align-items:center; gap:8px; font-family:var(--font-ui); font-size:0.95rem; font-weight:500; padding:0.75rem 1.5rem; border-radius:var(--radius); border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer; transition:all 0.15s ease; white-space:nowrap; }
+    .btn:hover { border-color:var(--border-hover); color:var(--text); background:var(--surface2); }
+    .btn:active { transform:scale(0.97); }
+    .btn-primary { background:var(--accent); color:#000; font-weight:700; border-color:transparent; }
+    .btn-primary:hover { background:var(--text-muted); transform:translateY(-1px); }
+    .btn-primary:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+    .btn-sm { font-size:0.9rem; padding:0.6rem 1.2rem; }
+    .btn-icon { width:36px; height:36px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; }
+    .btn-ghost { border-color:transparent; color:var(--text-muted); }
+    .btn-ghost:hover { border-color:var(--border); color:var(--text); background:var(--surface2); }
+    .btn-danger-sm { border-color:rgba(255,69,69,0.3); color:var(--danger); }
+    .btn-danger-sm:hover { background:rgba(255,69,69,0.1); }
+
+    /* COPY MODE */
+    .copy-mode { display:flex; gap:6px; background:var(--surface2); border-radius:8px; padding:6px; }
+    .copy-mode-btn { font-family:var(--font-mono); font-size:0.78rem; padding:7px 14px; border-radius:6px; border:none; background:transparent; color:var(--text-muted); cursor:pointer; transition:all 0.15s; font-weight:600; }
+    .copy-mode-btn.active { background:var(--surface); color:var(--text); border:1px solid var(--border); font-weight:700; }
+
+    /* EXPORT */
+    .export-wrap { position:relative; }
+    .export-menu { position:absolute; bottom:calc(100% + 6px); right:0; background:var(--surface2); border:1px solid var(--border-hover); border-radius:var(--radius); padding:4px; display:none; flex-direction:column; gap:2px; min-width:160px; z-index:50; }
+    .export-menu.open { display:flex; animation:fadeIn 0.15s ease; }
+    .export-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:6px; cursor:pointer; font-family:var(--font-mono); font-size:0.8rem; color:var(--text-muted); transition:all 0.1s; border:none; background:none; text-align:left; width:100%; font-weight:500; }
+    .export-item:hover { background:var(--surface3); color:var(--text); }
+
+    /* OUTPUT AREA */
+    .output-area { flex:1; padding:1.5rem; font-family:var(--font-mono); font-size:0.9rem; line-height:1.9; color:var(--text); min-height:320px; overflow-y:auto; }
+    .output-placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:320px; gap:1.5rem; text-align:center; padding:2rem; }
+    .output-placeholder svg { opacity:0.2; }
+    .ph-title { font-size:0.95rem; color:var(--text); font-weight:700; }
+    .ph-sub { font-size:0.85rem; font-family:var(--font-mono); color:var(--text-muted); line-height:1.7; }
+    .example-preview { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:0.875rem 1rem; text-align:left; margin-top:0.5rem; width:100%; max-width:280px; }
+    .ex-heading { font-size:0.8rem; color:var(--accent); font-weight:700; margin-bottom:0.75rem; }
+    .ex-entry { display:flex; align-items:flex-start; gap:6px; margin-bottom:0.3rem; }
+    .ex-tag { font-size:0.65rem; padding:2px 6px; border-radius:3px; white-space:nowrap; margin-top:2px; font-family:var(--font-mono); font-weight:500; }
+    .ex-tag-feat { background:rgba(0,229,160,0.2); color:#20e5a0; }
+    .ex-tag-fix { background:rgba(255,95,95,0.2); color:#ff6b6b; }
+    .ex-text { font-size:0.8rem; color:var(--text); line-height:1.6; font-family:var(--font-mono); font-weight:400; }
+    .error-state { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:320px; gap:1rem; text-align:center; padding:2rem; }
+    .error-icon { width:36px; height:36px; border-radius:50%; background:rgba(255,95,95,0.1); display:flex; align-items:center; justify-content:center; margin-bottom:0.25rem; }
+    .error-title { font-size:0.95rem; font-weight:700; color:var(--danger); }
+    .error-msg { font-size:0.85rem; font-family:var(--font-mono); color:var(--text-muted); line-height:1.7; max-width:300px; }
+    .output-version-header { font-family:var(--font-mono); font-size:0.8rem; color:var(--text-muted); margin-bottom:1.5rem; padding-bottom:1rem; border-bottom:1px solid var(--border); }
+    .output-version-header span { color:var(--accent); }
+    .output-area h2 { font-family:var(--font-ui); font-size:1rem; font-weight:700; color:var(--accent); margin:1.2rem 0 0.8rem; padding-bottom:0.5rem; border-bottom:1px solid var(--border); animation:fadeIn 0.3s ease both; }
+    .output-area h2:first-of-type { margin-top:0; }
+    .output-area .entry { display:flex; gap:12px; margin-bottom:0.6rem; align-items:flex-start; animation:fadeUp 0.25s ease both; }
+    .output-area .entry .tag { font-size:0.6rem; padding:2px 5px; border-radius:3px; white-space:nowrap; margin-top:3px; flex-shrink:0; font-family:var(--font-mono); }
+    .tag-feat { background:rgba(0,229,160,0.2); color:#20e5a0; font-weight:600; }
+    .tag-fix { background:rgba(255,95,95,0.2); color:#ff6b6b; font-weight:600; }
+    .tag-chore { background:rgba(122,138,132,0.15); color:var(--text-muted); }
+    .tag-improve { background:rgba(100,160,255,0.2); color:#64a0ff; font-weight:600; }
+    .version-tag { font-family:var(--font-mono); font-size:0.8rem; color:var(--text-muted); font-weight:500; }
+
+    /* INLINE EDITOR */
+    .editor-area { flex:1; background:transparent; border:none; outline:none; resize:none; color:var(--text); font-family:var(--font-mono); font-size:0.9rem; line-height:1.8; padding:1.5rem; min-height:320px; display:none; }
+    .editor-area.visible { display:block; }
+    .output-area.editing { display:none; }
+    .edit-indicator { font-family:var(--font-mono); font-size:0.75rem; color:var(--warning); padding:4px 10px; border-radius:4px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); font-weight:600; }
+
+    /* HISTORY */
+    .history-bar { animation: fadeUp 0.5s ease 0.38s both; max-width:1100px; width:100%; margin:0 auto; padding:0 2rem 4rem; }
+    .history-toggle { display:flex; align-items:center; gap:12px; cursor:pointer; width:fit-content; font-size:0.9rem; font-family:var(--font-mono); color:var(--text-muted); transition:color 0.15s; user-select:none; font-weight:600; }
+    .history-toggle:hover { color:var(--text-muted); }
+    .history-toggle .arrow { display:inline-block; transition:transform 0.2s; font-size:0.6rem; }
+    .history-toggle.open .arrow { transform:rotate(90deg); }
+    .history-count { background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:2px 8px; font-size:0.75rem; font-weight:600; }
+    .history-controls { display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem; }
+    .history-search { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:8px 12px; font-family:var(--font-mono); font-size:0.8rem; color:var(--text); outline:none; width:200px; transition:border-color 0.15s; }
+    .history-search:focus { border-color:var(--border-hover); }
+    .history-search::placeholder { color:var(--text-muted); }
+    .history-list { display:none; margin-top:1.2rem; flex-direction:column; gap:0.8rem; }
+    .history-list.visible { display:flex; animation:fadeIn 0.2s ease; }
+    .history-item { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1rem 1.25rem; display:flex; align-items:center; justify-content:space-between; gap:1.5rem; cursor:pointer; transition:border-color 0.15s; }
+    .history-item:hover { border-color:var(--border-hover); }
+    .history-item-info { flex:1; min-width:0; }
+    .history-item-version { font-family:var(--font-mono); font-size:0.85rem; color:var(--accent); font-weight:600; }
+    .history-item-meta { font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted); margin-top:4px; }
+    .history-item-preview { font-family:var(--font-mono); font-size:0.78rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:300px; margin-top:4px; }
+    .history-item-actions { display:flex; gap:6px; flex-shrink:0; }
+    .history-empty { font-family:var(--font-mono); font-size:0.8rem; color:var(--text-muted); padding:1rem; }
+
+    /* TOAST */
+    .toast { position:fixed; bottom:1.5rem; right:1.5rem; background:var(--surface2); border:1px solid var(--border-hover); border-radius:var(--radius); padding:0.6rem 1rem; font-size:0.8rem; font-family:var(--font-mono); color:var(--accent); opacity:0; transform:translateY(8px); transition:all 0.2s ease; pointer-events:none; z-index:100; max-width:300px; }
+    .toast.show { opacity:1; transform:translateY(0); }
+    .toast.warn { color:var(--warning); }
+    .toast.success { color:var(--success); }
+
+    /* BATCH RESULTS */
+    .batch-results { max-width:1100px; width:100%; margin:0 auto; padding:0 2rem 1.5rem; }
+    .batch-result-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); margin-bottom:1rem; overflow:hidden; }
+    .batch-result-header { display:flex; align-items:center; justify-content:space-between; padding:0.75rem 1.25rem; border-bottom:1px solid var(--border); background:var(--surface2); }
+    .batch-result-repo { font-family:var(--font-mono); font-size:0.8rem; color:var(--accent); }
+    .batch-result-body { padding:1.25rem; font-family:var(--font-mono); font-size:0.78rem; line-height:1.7; color:var(--text-muted); white-space:pre-wrap; max-height:250px; overflow-y:auto; }
+
+    /* GITHUB SIDEBAR */
+    .github-sidebar { display:none; width:240px; background:var(--surface); border-right:1px solid var(--border); flex-direction:column; overflow:hidden; animation:fadeIn 0.3s ease; }
+    .github-sidebar.visible { display:flex; }
+    .sidebar-header { padding:1.25rem; border-bottom:1px solid var(--border); }
+    .sidebar-title { font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted); letter-spacing:0.08em; text-transform:uppercase; font-weight:600; display:flex; align-items:center; gap:8px; margin-bottom:0.75rem; }
+    .sidebar-title svg { flex-shrink:0; }
+    .sidebar-search { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:6px 10px; font-family:var(--font-mono); font-size:0.75rem; color:var(--text); outline:none; width:100%; transition:border-color 0.15s; }
+    .sidebar-search:focus { border-color:var(--border-hover); }
+    .sidebar-search::placeholder { color:var(--text-dim); }
+    .repos-list { flex:1; overflow-y:auto; padding:0.5rem; display:flex; flex-direction:column; gap:0.4rem; }
+    .repos-list.loading { padding:1rem; display:flex; align-items:center; justify-content:center; }
+    .repos-list.loading::after { content:'Loading…'; font-family:var(--font-mono); font-size:0.8rem; color:var(--text-muted); animation:progressPulse 1.5s ease-in-out infinite; }
+    .repo-item { padding:8px 10px; border-radius:6px; border:1px solid transparent; background:var(--surface2); cursor:pointer; transition:all 0.15s; }
+    .repo-item:hover { border-color:var(--border-hover); background:var(--surface3); }
+    .repo-item.active { border-color:var(--accent); background:var(--accent-dim); }
+    .repo-item-name { font-family:var(--font-mono); font-size:0.8rem; color:var(--accent); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .repo-item-desc { font-family:var(--font-mono); font-size:0.7rem; color:var(--text-dim); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .repos-empty { font-family:var(--font-mono); font-size:0.8rem; color:var(--text-muted); padding:1rem; text-align:center; }
+    .github-sidebar-container { display:flex; width:100%; }
+
+    /* FOOTER */
+        footer { position:relative; z-index:1; padding:2rem; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; }
+        .footer-logo { display:flex; align-items:center; gap:8px; font-size:0.88rem; font-weight:700; letter-spacing:-0.02em; }
+        .footer-copy { font-family:var(--font-mono); font-size:0.68rem; color:var(--text-dim); }
+
+  </style>
+<link rel="stylesheet" href="/forkd-theme.css">
+</head>
+<body>
+<nav>
+  <div class="nav-container">
+    <div class="logo" onclick="window.location.href='index.html'">
+      <img src="logo.png" alt="Forkd logo" class="logo-img">Forkd
+    </div>
+    <div class="nav-links" aria-label="Main navigation">
+      <a class="nav-link" href="/discover">Discover</a>
+      <a class="nav-link" href="/publish">Publish</a>
+      <a class="nav-link" href="/dashboard.html">Dashboard</a>
+    </div>
+    <div id="auth-section"></div>
+  </div>
+</nav>
+
+<div class="hero">
+  <h1>Commits in.<br/><span>Changelogs out.</span></h1>
+  <p>Paste commits or fetch from GitHub. Get a clean, human-readable changelog in seconds.</p>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="field"><span class="field-label">title</span><input type="text" id="titleInput" placeholder="My Release" /></div>
+            <div class="field"><span class="field-label">version</span><input type="text" id="versionInput" placeholder="v1.0.0" /></div>
+  <div class="field"><span class="field-label">date</span><input type="date" id="dateInput" /></div>
+  <div class="field field-github">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+    <input type="text" id="githubInput" placeholder="owner/repo — fetch commits from GitHub" />
+  </div>
+  <button class="btn btn-sm" id="fetchGithubBtn">Fetch</button>
+  <span class="github-status" id="githubStatus"></span>
+  <!-- Language selector -->
+  <select class="lang-select" id="langSelect" title="Output language">
+    <option value="en">🇬🇧 English</option>
+    <option value="es">🇪🇸 Español</option>
+    <option value="fr">🇫🇷 Français</option>
+    <option value="de">🇩🇪 Deutsch</option>
+    <option value="pt">🇧🇷 Português</option>
+    <option value="zh">🇨🇳 中文</option>
+    <option value="ja">🇯🇵 日本語</option>
+    <option value="ko">🇰🇷 한국어</option>
+    <option value="tr">🇹🇷 Türkçe</option>
+    <option value="ar">🇸🇦 العربية</option>
+  </select>
+</div>
+
+<!-- TEMPLATES -->
+<div class="templates-bar">
+  <span class="templates-label">// template:</span>
+  <button class="template-btn active" data-template="default">Standard</button>
+  <button class="template-btn" data-template="compact">Compact</button>
+  <button class="template-btn" data-template="detailed">Detailed</button>
+  <button class="template-btn" data-template="keepachangelog">Keep a Changelog</button>
+  <button class="template-btn" data-template="release-notes">Release Notes</button>
+</div>
+
+<!-- CUSTOM SECTIONS -->
+<div class="sections-bar">
+  <div class="sections-toggle" id="sectionsToggle"><span class="arrow">▶</span><span>customize sections</span></div>
+  <div class="sections-editor" id="sectionsEditor">
+    <p>// drag to reorder · click name to rename · these sections will be used in your changelog</p>
+    <div class="sections-list" id="sectionsList"></div>
+    <div class="sections-actions">
+      <input type="text" class="add-section-input" id="newSectionInput" placeholder="New section name" />
+      <button class="btn btn-sm btn-ghost" id="addSectionBtn">+ Add</button>
+      <button class="btn btn-sm btn-ghost" id="resetSectionsBtn">Reset defaults</button>
+    </div>
+  </div>
+</div>
+
+<!-- BATCH PROCESSING (Pro) -->
+<div class="batch-bar" id="batchBar" style="display:none;">
+  <div class="batch-toggle" id="batchToggle"><span class="arrow">▶</span><span>batch processing</span><span class="badge" style="margin-left:4px;">PRO</span></div>
+  <div class="batch-editor" id="batchEditor">
+    <p>// add multiple owner/repo pairs to generate changelogs for all at once</p>
+    <div class="batch-repos" id="batchRepos">
+      <div class="batch-repo-row">
+        <input class="batch-repo-input" placeholder="owner/repo" />
+        <span class="batch-status"></span>
+      </div>
+    </div>
+    <div class="sections-actions">
+      <button class="btn btn-sm btn-ghost" id="addBatchRepoBtn">+ Add repo</button>
+      <button class="btn btn-sm btn-primary" id="runBatchBtn">Run batch →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN PANELS -->
+<div class="github-sidebar-container">
+  <div class="github-sidebar" id="githubSidebar">
+    <div class="sidebar-header">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+        <div class="sidebar-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>Your repos</div>
+        <button onclick="refreshGitHubRepos()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;transition:color 0.2s;" title="Refresh repos" id="repoRefreshBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+        </button>
+      </div>
+      <input type="text" class="sidebar-search" id="repoSearch" placeholder="Search repos…" />
+    </div>
+    <div class="repos-list" id="reposList"></div>
+  </div>
+<main>
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">// git commits</span>
+      <span class="commit-counter" id="commitCounter">0 commits</span>
+    </div>
+    <div class="loading-bar" id="loadingBar"></div>
+    <textarea id="commitsInput" placeholder="Paste your git commits here...
+
+Example:
+feat: add user authentication
+fix: resolve null pointer on dashboard
+chore: update dependencies
+feat: dark mode support
+fix: broken links in footer"></textarea>
+    <div class="panel-footer">
+      <div class="footer-left"><button class="btn btn-ghost btn-sm" id="clearBtn">Clear</button></div>
+      <div class="footer-right"><button class="btn btn-primary" id="generateBtn">Generate changelog →</button></div>
+    </div>
+  </div>
+
+  <div class="panel" id="outputPanel">
+    <!-- Real-time progress overlay -->
+    <div class="progress-overlay" id="progressOverlay">
+      <div class="progress-steps">
+        <div class="progress-step" id="step-auth"><div class="progress-step-dot"></div>Authenticating</div>
+        <div class="progress-step" id="step-send"><div class="progress-step-dot"></div>Sending to AI</div>
+        <div class="progress-step" id="step-gen"><div class="progress-step-dot"></div>Generating</div>
+        <div class="progress-step" id="step-done"><div class="progress-step-dot"></div>Finalizing</div>
+      </div>
+      <div class="progress-label" id="progressLabel">Processing…</div>
+    </div>
+
+    <div class="panel-header">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="panel-title">// changelog output</span>
+        <span class="edit-indicator" id="editIndicator" style="display:none;">editing</span>
+      </div>
+      <div class="header-actions">
+        <div class="copy-mode">
+          <button class="copy-mode-btn active" id="modeFormatted">formatted</button>
+          <button class="copy-mode-btn" id="modeRaw">raw .md</button>
+        </div>
+        <button class="btn btn-icon btn-ghost" id="editToggleBtn" title="Edit output" style="display:none;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="btn btn-icon" id="copyBtn" title="Copy">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="output-area" id="outputArea">
+      <div class="output-placeholder">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <div class="ph-title">Your changelog will appear here</div>
+        <div class="ph-sub">Paste commits and click Generate,<br/>or fetch directly from a GitHub repo.</div>
+        <div class="example-preview">
+          <div class="ex-heading">## New Features</div>
+          <div class="ex-entry"><span class="ex-tag ex-tag-feat">new</span><span class="ex-text">Added user authentication with login and signup.</span></div>
+          <div class="ex-heading" style="margin-top:0.5rem">## Bug Fixes</div>
+          <div class="ex-entry"><span class="ex-tag ex-tag-fix">fix</span><span class="ex-text">Fixed broken links in the footer navigation.</span></div>
+        </div>
+      </div>
+    </div>
+    <!-- Inline editor textarea (hidden until edit mode) -->
+    <textarea class="editor-area" id="editorArea" placeholder="Edit your changelog here…"></textarea>
+    <div class="panel-footer">
+      <span class="version-tag" id="versionTag"></span>
+      <div class="footer-right">
+        <button class="btn btn-sm btn-ghost" id="saveEditBtn" style="display:none;">Save edits</button>
+        <button class="btn btn-sm btn-ghost" id="shareBtn" title="Share as public link" style="display:none;">Share ↗</button>
+        <button class="btn btn-sm btn-ghost" id="releaseBtn" title="Push to GitHub Releases" style="display:none;">🚀 Release</button>
+        <div class="export-wrap">
+          <button class="btn btn-sm" id="exportBtn">Export ↓</button>
+          <div class="export-menu" id="exportMenu">
+            <button class="export-item" id="exportMd">📄 Download .md</button>
+            <button class="export-item" id="exportTxt">📝 Download .txt</button>
+            <button class="export-item" id="exportPlain">📋 Copy as plain text</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- BATCH RESULTS -->
+<div class="batch-results" id="batchResults" style="display:none;"></div>
+
+<!-- HISTORY -->
+<div class="history-bar">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;">
+    <div class="history-toggle" id="historyToggle">
+      <span class="arrow">▶</span>
+      <span>recent changelogs</span>
+      <span class="history-count" id="historyCount">0</span>
+    </div>
+  </div>
+  <div class="history-list" id="historyList">
+    <div class="history-controls">
+      <input type="text" class="history-search" id="historySearch" placeholder="Search history…" />
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+  <footer>
+    <div class="footer-logo"><img src="logo.png" alt="Forkd logo" class="logo-img">Forkd</div>
+    <div class="extension-banner" style="background: #1c1c1c; border-bottom: 1px solid #2a2a2a; padding: 10px; text-align: center; font-size: 13px;">
+  <span>Prefer coding from your IDE? Download our official </span>
+  <a href="https://marketplace.visualstudio.com/items?itemName=forkd.forkd-ai" target="_blank" style="color: #007ACC; font-weight: 600; text-decoration: underline;">VS Code Extension</a>.
+</div>
+    </div>
+    <div class="footer-copy">© 2026 Forkd AI</div>
+  </footer>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+function loadAppearancePreferences() {
+  if (localStorage.getItem('darkMode') === 'false') document.body.classList.add('light-mode');
+  if (localStorage.getItem('animationsEnabled') === 'false') document.body.classList.add('no-animations');
+}
+loadAppearancePreferences();
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBu1N-awPnUjXAVqzWtCyhxTDBC-4QPNak",
+  authDomain: "changlelog-generator.firebaseapp.com",
+  projectId: "changlelog-generator",
+  storageBucket: "changlelog-generator.firebasestorage.app",
+  messagingSenderId: "640801556466",
+  appId: "1:640801556466:web:2bce80e0bab1021cc44d6b"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// ── DOM refs ──
+const input = document.getElementById('commitsInput');
+const outputArea = document.getElementById('outputArea');
+const editorArea = document.getElementById('editorArea');
+const generateBtn = document.getElementById('generateBtn');
+const clearBtn = document.getElementById('clearBtn');
+const copyBtn = document.getElementById('copyBtn');
+const commitCounter = document.getElementById('commitCounter');
+const versionInput = document.getElementById('versionInput');
+const dateInput = document.getElementById('dateInput');
+const githubInput = document.getElementById('githubInput');
+const fetchGithubBtn = document.getElementById('fetchGithubBtn');
+const githubStatus = document.getElementById('githubStatus');
+const toast = document.getElementById('toast');
+const sectionsToggle = document.getElementById('sectionsToggle');
+const sectionsEditor = document.getElementById('sectionsEditor');
+const sectionsList = document.getElementById('sectionsList');
+const newSectionInput = document.getElementById('newSectionInput');
+const addSectionBtn = document.getElementById('addSectionBtn');
+const resetSectionsBtn = document.getElementById('resetSectionsBtn');
+const historyToggle = document.getElementById('historyToggle');
+const historyList = document.getElementById('historyList');
+const historyCount = document.getElementById('historyCount');
+const historySearch = document.getElementById('historySearch');
+const exportBtn = document.getElementById('exportBtn');
+const exportWrap = document.querySelector('.export-wrap');
+const exportMenu = document.getElementById('exportMenu');
+const exportMd = document.getElementById('exportMd');
+const exportTxt = document.getElementById('exportTxt');
+const exportPlain = document.getElementById('exportPlain');
+const modeFormatted = document.getElementById('modeFormatted');
+const modeRaw = document.getElementById('modeRaw');
+const editToggleBtn = document.getElementById('editToggleBtn');
+const editIndicator = document.getElementById('editIndicator');
+const saveEditBtn = document.getElementById('saveEditBtn');
+const shareBtn = document.getElementById('shareBtn');
+const releaseBtn = document.getElementById('releaseBtn');
+const progressOverlay = document.getElementById('progressOverlay');
+const progressLabel = document.getElementById('progressLabel');
+const langSelect = document.getElementById('langSelect');
+const batchToggle = document.getElementById('batchToggle');
+const batchEditor = document.getElementById('batchEditor');
+const addBatchRepoBtn = document.getElementById('addBatchRepoBtn');
+const runBatchBtn = document.getElementById('runBatchBtn');
+const batchResults = document.getElementById('batchResults');
+const batchBar = document.getElementById('batchBar');
+
+// ── State ──
+let generatedMarkdown = '';
+let isEditMode = false;
+const COMMIT_WARN = 40;
+const COMMIT_MAX = 80;
+const DEFAULT_SECTIONS = ['New Features', 'Bug Fixes', 'Improvements', 'Other'];
+let sections = [...DEFAULT_SECTIONS];
+let historyItems = [];
+try { historyItems = JSON.parse(localStorage.getItem('changelog_history') || '[]'); } catch(e) {}
+let currentActiveTemplate = 'default';
+let currentUser = null;
+let currentPlan = 'free';
+let authChecked = false;
+
+// ── Template definitions ──
+const TEMPLATES = {
+  default: { label: 'Standard', sections: ['New Features', 'Bug Fixes', 'Improvements', 'Other'], prompt: '' },
+  compact: { label: 'Compact', sections: ['Added', 'Fixed', 'Changed'], prompt: 'Be very concise — one short sentence per item, no fluff. Try to keep it short and dont get into details.' },
+  detailed: { label: 'Detailed', sections: ['New Features', 'Bug Fixes', 'Performance', 'Security', 'Breaking Changes', 'Deprecated'], prompt: 'Be thorough and detailed. Include impact, affected areas, and migration notes where relevant.' },
+  keepachangelog: { label: 'Keep a Changelog', sections: ['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security'], prompt: 'Follow the Keep a Changelog format (https://keepachangelog.com). Use exactly these sections.' },
+  'release-notes': { label: 'Release Notes', sections: ['Highlights', 'Improvements', 'Bug Fixes', 'Known Issues'], prompt: 'Write in a friendly, user-facing release notes tone. Lead with the most exciting change as a Highlight.' }
+};
+
+// ── Language names ──
+const LANG_NAMES = { en:'English', es:'Spanish', fr:'French', de:'German', pt:'Portuguese', zh:'Chinese', ja:'Japanese', ko:'Korean', tr:'Turkish', ar:'Arabic' };
+
+// ── Auth ──
+onAuthStateChanged(auth, async (user) => {
+  authChecked = true;
+  currentUser = user;
+  const authSection = document.getElementById('auth-section');
+
+  if (user) {
+    authSection.innerHTML = `
+      <div class="user-profile-nav" style="display:flex;align-items:center;gap:12px;background:var(--surface2);padding:6px 14px;border-radius:50px;border:1px solid var(--border);">
+        <div style="display:flex;flex-direction:column;align-items:flex-end;">
+          <span style="font-size:11px;font-weight:700;color:var(--text);line-height:1;">${user.displayName?.split(' ')[0] || 'User'}</span>
+          <span id="usage-display" style="font-size:10px;color:var(--text-muted);line-height:1;margin-top:4px;">Loading…</span>
+        </div>
+        <img src="${user.photoURL || ''}" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--border);">
+        <a href="dashboard.html" style="font-size:11px;font-weight:600;color:var(--accent);text-decoration:none;">Dashboard</a>
+        <button onclick="logout()" style="background:none;border:none;color:var(--danger);cursor:pointer;font-weight:700;font-size:10px;">EXIT</button>
+      </div>`;
+    await refreshUsageDisplay(user);
+  } else {
+    window.location.replace('/login.html');
+  }
+});
+
+async function refreshUsageDisplay(user) {
+  try {
+    const snap = await getDoc(doc(db, 'users', user.uid));
+    const data = snap.data() || {};
+    const plan = data.status || 'free';
+    currentPlan = plan;
+
+    const today = new Date().toISOString().split('T')[0];
+    const used = data[`usage_${today}`] || 0;
+    const limit = plan === 'pro' ? 50 : 25;
+
+    const el = document.getElementById('usage-display');
+    if (el) {
+      el.textContent = `${used}/${limit} today`;
+      el.style.color = used >= limit ? 'var(--danger)' : 'var(--text-muted)';
+    }
+
+    // GitHub fetch is now free for all users
+    fetchGithubBtn.disabled = false;
+    githubInput.disabled = false;
+    githubStatus.className = 'github-status visible loading';
+    githubStatus.textContent = '✓ GitHub auto-fetch ready';
+
+    // Batch bar visibility (Pro only)
+    batchBar.style.display = plan === 'pro' ? 'block' : 'none';
+
+    // GitHub sidebar - check if GitHub is linked (available for all)
+    if (user) {
+      const hasGithub = user.providerData.some(p => p.providerId === 'github.com');
+      const sidebar = document.getElementById('githubSidebar');
+      if (hasGithub) {
+        sidebar.classList.add('visible');
+        loadGitHubRepos(user);
+      } else {
+        sidebar.classList.remove('visible');
+      }
+    }
+
+    return { used, limit, plan };
+  } catch(e) { console.error('Usage check error:', e); return null; }
+}
+
+function updateUsageDisplay(current, limit) {
+  const el = document.getElementById('usage-display');
+  if (!el) return;
+  el.textContent = `${current}/${limit} today`;
+  el.style.color = current >= limit ? 'var(--danger)' : 'var(--text-muted)';
+}
+
+// ── Progress steps ──
+function setProgressStep(step) {
+  // step: 0=auth, 1=send, 2=gen, 3=done
+  const steps = ['step-auth','step-send','step-gen','step-done'];
+  const labels = ['Authenticating…','Sending to AI…','Generating changelog…','Finalizing…'];
+  steps.forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.className = 'progress-step' + (i < step ? ' done' : i === step ? ' active' : '');
+  });
+  if (step < labels.length) progressLabel.textContent = labels[step];
+}
+
+function showProgress(show) {
+  progressOverlay.classList.toggle('visible', show);
+  if (show) setProgressStep(0);
+}
+
+// ── Auth guard on back/forward ──
+window.addEventListener('pageshow', (e) => {
+  const bfCache = e.persisted || (performance.getEntriesByType('navigation')[0]?.type === 'back_forward');
+  if (!bfCache) return;
+  if (!authChecked) { window.location.reload(); return; }
+  if (!auth.currentUser) window.location.replace('/login.html');
+});
+
+window.logout = () => signOut(auth).then(() => window.location.href = '/index.html');
+
+// ── GitHub repos sidebar ──
+let allRepos = [];
+let filteredRepos = [];
+
+async function loadGitHubRepos(user) {
+  const reposList = document.getElementById('reposList');
+  reposList.classList.add('loading');
+  reposList.textContent = '';
+
+  try {
+    const token = await user.getIdToken();
+    const response = await fetch('/github-repos', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Failed to load repos:', response.status, data);
+      reposList.classList.remove('loading');
+      
+      let errorMsg = 'Failed to load repos';
+      if (data.message) errorMsg = data.message;
+      else if (data.error === 'GitHub not linked') errorMsg = 'GitHub not linked. Link it in Dashboard → Account.';
+      else if (data.error === 'GitHub API failed') errorMsg = 'GitHub token expired. Unlink and relink your account.';
+      
+      reposList.innerHTML = `<div class="repos-empty" style="white-space:normal;padding:1rem;font-size:0.75rem;line-height:1.5;">${errorMsg}</div>`;
+      return;
+    }
+
+    allRepos = data.repos || [];
+    filteredRepos = [...allRepos];
+
+    reposList.classList.remove('loading');
+    renderReposList();
+  } catch (err) {
+    console.error('Failed to load repos:', err);
+    reposList.classList.remove('loading');
+    reposList.innerHTML = `<div class="repos-empty">Error loading repos. Check console.</div>`;
+  }
+}
+
+function renderReposList() {
+  const reposList = document.getElementById('reposList');
+
+  if (filteredRepos.length === 0) {
+        reposList.innerHTML = `<div class="repos-empty">${allRepos.length === 0 ? 'Refresh to load repos' : 'No results'}</div>`;
+  }
+
+  reposList.innerHTML = filteredRepos.map(repo => `
+    <div class="repo-item" onclick="selectRepo('${repo.owner}', '${repo.name}')">
+      <div class="repo-item-name">${repo.name}</div>
+      ${repo.description ? `<div class="repo-item-desc">${repo.description}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function selectRepo(owner, name) {
+  const repoStr = `${owner}/${name}`;
+  githubInput.value = repoStr;
+
+  // Mark as active
+  document.querySelectorAll('.repo-item').forEach(el => el.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+
+  // Auto-fetch commits
+  triggerGitHubFetch();
+}
+
+window.selectRepo = selectRepo;
+window.refreshGitHubRepos = async () => {
+  if (!currentUser) return;
+  const btn = document.getElementById('repoRefreshBtn');
+  btn.style.animation = 'spin 0.8s linear infinite';
+  btn.disabled = true;
+  try {
+    await loadGitHubRepos(currentUser);
+  } finally {
+    btn.style.animation = 'none';
+    btn.disabled = false;
+  }
+};
+
+function triggerGitHubFetch() {
+  const repo = githubInput.value.trim();
+  if (!repo) return;
+  fetchGithubBtn.click();
+}
+
+document.getElementById('repoSearch').addEventListener('input', (e) => {
+  const query = e.target.value.toLowerCase().trim();
+  if (!query) {
+    filteredRepos = [...allRepos];
+  } else {
+    filteredRepos = allRepos.filter(repo =>
+      repo.name.toLowerCase().includes(query) ||
+      (repo.description && repo.description.toLowerCase().includes(query))
+    );
+  }
+  renderReposList();
+});
+
+// ── GitHub fetch ──
+fetchGithubBtn.addEventListener('click', async () => {
+  const repo = githubInput.value.trim();
+  if (!repo.includes('/')) return showToast('Invalid format. Use owner/repo', 'warn');
+  fetchGithubBtn.disabled = true;
+  githubStatus.className = 'github-status visible loading';
+  githubStatus.innerHTML = '<span class="spin">⟳</span> Fetching…';
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/commits?per_page=30`);
+    if (!res.ok) throw new Error(res.status === 404 ? 'Repo not found' : `GitHub error ${res.status}`);
+    const commits = await res.json();
+    if (!Array.isArray(commits) || !commits.length) throw new Error('No commits found');
+    input.value = commits.map(c => c.commit.message.split('\n')[0]).join('\n');
+    input.dispatchEvent(new Event('input'));
+    githubStatus.className = 'github-status visible';
+    githubStatus.innerHTML = `✓ ${commits.length} commits loaded`;
+  } catch(err) {
+    githubStatus.className = 'github-status visible error';
+    githubStatus.innerHTML = '✕ ' + err.message;
+  } finally { fetchGithubBtn.disabled = false; }
+});
+
+// ── Commit counter ──
+input.addEventListener('input', () => {
+  const lines = input.value.split('\n').filter(l => l.trim()).length;
+  commitCounter.textContent = `${lines} commits`;
+  commitCounter.className = 'commit-counter' + (lines > COMMIT_MAX ? ' danger' : lines > COMMIT_WARN ? ' warn' : '');
+});
+
+// ── Template buttons ──
+document.querySelectorAll('.template-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.template-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentActiveTemplate = btn.dataset.template;
+    const tpl = TEMPLATES[currentActiveTemplate];
+    if (tpl) {
+      sections = [...tpl.sections];
+      renderSections();
+      showToast(`Template: ${tpl.label}`, '');
+    }
+  });
+});
+
+// ── Generate ──
+generateBtn.addEventListener('click', async () => {
+  const commits = input.value.trim();
+  if (!commits) return showToast('Paste commits first', 'warn');
+  if (!currentUser) return showToast('Not logged in', 'warn');
+
+  generateBtn.disabled = true;
+  generateBtn.textContent = 'Generating…';
+  showProgress(true);
+
+  try {
+    setProgressStep(0);
+    const idToken = await currentUser.getIdToken();
+
+    setProgressStep(1);
+    const lang = langSelect.value;
+    const langName = LANG_NAMES[lang] || 'English';
+    const template = TEMPLATES[currentActiveTemplate] || TEMPLATES.default;
+    const sectionList = sections.join(', ');
+    const langInstruction = lang !== 'en' ? `\n\nIMPORTANT: Write the entire output in ${langName}. All section headings and entries must be in ${langName}.` : '';
+    const templateInstruction = template.prompt ? `\n\nTemplate style: ${template.prompt}` : '';
+
+    setProgressStep(2);
+    const response = await fetch('/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+      body: JSON.stringify({ commits, sections: sectionList, templateInstruction, langInstruction })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      showProgress(false);
+      if (data.error === 'limit_reached') { showLimitUpgradeModal(data); return; }
+      showToast(`Error: ${data.error || 'Failed to generate'}`, 'warn');
+      generateBtn.disabled = false; generateBtn.textContent = 'Generate changelog →';
+      return;
+    }
+
+    setProgressStep(3);
+    if (data.changelog) {
+      generatedMarkdown = data.changelog;
+      renderChangelog(data.changelog);
+      saveToHistory(data.changelog, versionInput.value, dateInput.value, 'manual');
+      editToggleBtn.style.display = 'inline-flex';
+      shareBtn.style.display = 'inline-flex';
+      releaseBtn.style.display = 'inline-flex';
+      showToast('Generated!', 'success');
+      if (data.usage) updateUsageDisplay(data.usage.current, data.usage.limit);
+    } else {
+      showToast('No changelog returned', 'warn');
+      generateBtn.disabled = false; generateBtn.textContent = 'Generate changelog →';
+    }
+  } catch(err) {
+    console.error('Generate error:', err);
+    showToast(`Failed: ${err.message}`, 'warn');
+    generateBtn.disabled = false; generateBtn.textContent = 'Generate changelog →';
+  } finally {
+    setTimeout(() => showProgress(false), 400);
+  }
+});
+
+// ── Render changelog ──
+function renderChangelog(markdown) {
+  if (isEditMode) exitEditMode();
+  outputArea.innerHTML = '';
+  const date = dateInput.value || new Date().toLocaleDateString();
+  const header = document.createElement('div');
+  header.className = 'output-version-header';
+  header.innerHTML = `<span>${versionInput.value || 'v1.0.0'}</span> · ${date}`;
+  outputArea.appendChild(header);
+  let delay = 0;
+  markdown.split('\n').forEach(line => {
+    if (!line.trim()) return;
+    if (line.startsWith('## ') || line.startsWith('# ')) {
+      const h = document.createElement('h2');
+      h.textContent = line.replace(/^#{1,2}\s+/, '');
+      h.style.animationDelay = delay + 'ms';
+      outputArea.appendChild(h); delay += 40; return;
+    }
+    const el = document.createElement('div');
+    if (line.startsWith('- ') || line.startsWith('* ')) {
+      const content = line.replace(/^[-*] /, '');
+      let tagClass = 'tag-chore', tagLabel = 'note';
+      if (/feat|add|new/i.test(content)) { tagClass = 'tag-feat'; tagLabel = 'new'; }
+      else if (/fix|bug|patch/i.test(content)) { tagClass = 'tag-fix'; tagLabel = 'fix'; }
+      else if (/improv|updat|perf|refactor|change|optim/i.test(content)) { tagClass = 'tag-improve'; tagLabel = 'change'; }
+      el.className = 'entry'; el.style.animationDelay = delay + 'ms';
+      el.innerHTML = `<span class="tag ${tagClass}">${tagLabel}</span><span>${content}</span>`;
+      delay += 40;
+    } else {
+      el.textContent = line; el.style.color = 'var(--text-muted)'; el.style.marginBottom = '0.5rem';
+    }
+    outputArea.appendChild(el);
+  });
+}
+
+// ── Edit mode ──
+function enterEditMode() {
+  isEditMode = true;
+  editorArea.value = generatedMarkdown;
+  editorArea.classList.add('visible');
+  outputArea.classList.add('editing');
+  editIndicator.style.display = 'inline-flex';
+  saveEditBtn.style.display = 'inline-flex';
+  editToggleBtn.title = 'Cancel editing';
+  editToggleBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+}
+
+function exitEditMode(save = false) {
+  isEditMode = false;
+  if (save) { generatedMarkdown = editorArea.value; renderChangelog(generatedMarkdown); }
+  editorArea.classList.remove('visible');
+  outputArea.classList.remove('editing');
+  editIndicator.style.display = 'none';
+  saveEditBtn.style.display = 'none';
+  editToggleBtn.title = 'Edit output';
+  editToggleBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+}
+
+editToggleBtn.addEventListener('click', () => isEditMode ? exitEditMode(false) : enterEditMode());
+saveEditBtn.addEventListener('click', () => exitEditMode(true));
+shareBtn.addEventListener('click', () => shareChangelog());
+releaseBtn.addEventListener('click', () => pushToGitHub());
+
+// ── History ──
+function renderHistory(filter = '') {
+  const items = filter
+    ? historyItems.filter(e => (e.markdown||'').toLowerCase().includes(filter) || (e.version||'').toLowerCase().includes(filter))
+    : historyItems;
+
+  historyCount.textContent = historyItems.length;
+
+  // Keep the search bar control row; rebuild item rows after it
+  const controlRow = historyList.querySelector('.history-controls');
+  // remove old item rows
+  historyList.querySelectorAll('.history-item').forEach(n => n.remove());
+  const emptyEl = historyList.querySelector('.history-empty');
+  if (emptyEl) emptyEl.remove();
+
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.className = 'history-empty';
+    empty.textContent = filter ? 'No matches.' : 'No history yet.';
+    historyList.appendChild(empty);
+    return;
+  }
+
+  items.forEach((e, i) => {
+    const div = document.createElement('div');
+    div.className = 'history-item';
+    div.innerHTML = `
+      <div class="history-item-info">
+        <div class="history-item-version">${e.version || 'v1.0.0'}</div>
+        <div class="history-item-meta">${e.date || ''} · ${e.source || 'manual'}</div>
+        <div class="history-item-preview">${(e.markdown||'').substring(0,60)}…</div>
+      </div>
+      <div class="history-item-actions">
+        <button class="btn btn-ghost btn-sm" onclick="restoreHistory(${i})">Restore</button>
+        <button class="btn btn-ghost btn-sm" onclick="copyHistoryItem(${i})">Copy</button>
+        <button class="btn btn-ghost btn-sm btn-danger-sm" onclick="deleteHistory(${i})">×</button>
+      </div>`;
+    historyList.appendChild(div);
+  });
+}
+
+window.restoreHistory = (i) => {
+  const filter = historySearch.value.toLowerCase();
+  const items = filter ? historyItems.filter(e => (e.markdown||'').toLowerCase().includes(filter)||(e.version||'').toLowerCase().includes(filter)) : historyItems;
+  const e = items[i];
+  if (!e) return;
+  generatedMarkdown = e.markdown;
+  renderChangelog(e.markdown);
+  editToggleBtn.style.display = 'inline-flex';
+  shareBtn.style.display = 'inline-flex';
+  releaseBtn.style.display = 'inline-flex';
+};
+
+window.copyHistoryItem = (i) => {
+  const filter = historySearch.value.toLowerCase();
+  const items = filter ? historyItems.filter(e => (e.markdown||'').toLowerCase().includes(filter)) : historyItems;
+  navigator.clipboard.writeText(items[i]?.markdown || '').then(() => showToast('Copied!', 'success'));
+};
+
+window.deleteHistory = (i) => {
+  historyItems.splice(i, 1);
+  localStorage.setItem('changelog_history', JSON.stringify(historyItems));
+  renderHistory(historySearch.value.toLowerCase());
+};
+
+function saveToHistory(markdown, version, date, source = 'manual') {
+  const limit = currentPlan === 'pro' ? 50 : 25;
+  historyItems.unshift({ markdown, version: version || 'v1.0.0', date, preview: markdown.substring(0, 60) + '…', source, savedAt: new Date().toISOString() });
+  if (historyItems.length > limit) historyItems = historyItems.slice(0, limit);
+  localStorage.setItem('changelog_history', JSON.stringify(historyItems));
+  renderHistory(historySearch.value.toLowerCase());
+}
+
+// History search
+historySearch.addEventListener('input', () => renderHistory(historySearch.value.toLowerCase()));
+
+// ── Sections ──
+function renderSections() {
+  sectionsList.innerHTML = sections.map((name, i) => `
+    <div class="section-chip" draggable="true" data-index="${i}">
+      <span class="section-chip-name">${name}</span>
+      <button class="section-chip-remove" data-index="${i}">×</button>
+    </div>`).join('');
+  attachDragHandlers();
+}
+
+function attachDragHandlers() {
+  let dragIdx = null;
+  sectionsList.querySelectorAll('.section-chip').forEach(chip => {
+    chip.addEventListener('dragstart', () => { dragIdx = +chip.dataset.index; chip.classList.add('dragging'); });
+    chip.addEventListener('dragend', () => chip.classList.remove('dragging'));
+    chip.addEventListener('dragover', e => { e.preventDefault(); chip.classList.add('drag-over'); });
+    chip.addEventListener('dragleave', () => chip.classList.remove('drag-over'));
+    chip.addEventListener('drop', () => {
+      chip.classList.remove('drag-over');
+      const targetIdx = +chip.dataset.index;
+      if (dragIdx === null || dragIdx === targetIdx) return;
+      const moved = sections.splice(dragIdx, 1)[0];
+      sections.splice(targetIdx, 0, moved);
+      renderSections();
+    });
+  });
+}
+
+sectionsList.addEventListener('click', e => {
+  if (!e.target.classList.contains('section-chip-remove')) return;
+  sections.splice(+e.target.dataset.index, 1);
+  renderSections();
+});
+
+addSectionBtn.addEventListener('click', () => {
+  const name = newSectionInput.value.trim();
+  if (!name) return showToast('Enter a section name', 'warn');
+  sections.push(name);
+  newSectionInput.value = '';
+  renderSections();
+});
+
+resetSectionsBtn.addEventListener('click', () => { sections = [...DEFAULT_SECTIONS]; renderSections(); });
+
+sectionsToggle.addEventListener('click', () => {
+  sectionsEditor.classList.toggle('visible');
+  sectionsToggle.classList.toggle('open');
+});
+
+// ── History toggle ──
+historyToggle.addEventListener('click', () => {
+  historyList.classList.toggle('visible');
+  historyToggle.classList.toggle('open');
+});
+
+// ── Batch processing (Pro) ──
+batchToggle.addEventListener('click', () => {
+  batchEditor.classList.toggle('visible');
+  batchToggle.classList.toggle('open');
+});
+
+addBatchRepoBtn.addEventListener('click', () => {
+  const row = document.createElement('div');
+  row.className = 'batch-repo-row';
+  row.innerHTML = `<input class="batch-repo-input" placeholder="owner/repo" /><span class="batch-status"></span>`;
+  document.getElementById('batchRepos').appendChild(row);
+});
+
+runBatchBtn.addEventListener('click', async () => {
+  if (currentPlan !== 'pro') return showToast('Batch processing is Pro only', 'warn');
+  if (!currentUser) return showToast('Not logged in', 'warn');
+
+  const inputs = Array.from(document.querySelectorAll('.batch-repo-input'));
+  const validRepos = inputs.map(input => {
+    const value = input.value.trim();
+    return value.includes('/') ? { repo: value, statusEl: input.parentElement.querySelector('.batch-status'), input } : null;
+  }).filter(Boolean);
+  
+  if (!validRepos.length) return showToast('Add at least one valid owner/repo', 'warn');
+
+  batchResults.style.display = 'block';
+  batchResults.innerHTML = `<p style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-dim);margin-bottom:1rem;">// running batch for ${validRepos.length} repo${validRepos.length > 1 ? 's' : ''}…</p>`;
+
+  runBatchBtn.disabled = true;
+  runBatchBtn.textContent = 'Running…';
+
+  for (let idx = 0; idx < validRepos.length; idx++) {
+    const { repo, statusEl } = validRepos[idx];
+    if (statusEl) { statusEl.textContent = '⟳'; statusEl.className = 'batch-status running'; }
+
+    try {
+      // Add 11-second delay between requests to avoid server cooldown (10s)
+      if (idx > 0) await new Promise(resolve => setTimeout(resolve, 11000));
+
+      // Fetch commits
+      const ghRes = await fetch(`https://api.github.com/repos/${repo}/commits?per_page=20`);
+      if (!ghRes.ok) throw new Error(`Repo ${repo} not found`);
+      const commits = await ghRes.json();
+      const commitText = commits.map(c => c.commit.message.split('\n')[0]).join('\n');
+
+      // Generate
+      const idToken = await currentUser.getIdToken();
+      const genRes = await fetch('/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify({ commits: commitText })
+      });
+      const genData = await genRes.json();
+      if (!genRes.ok) throw new Error(genData.error || 'Generation failed');
+
+      if (statusEl) { statusEl.textContent = '✓'; statusEl.className = 'batch-status done'; }
+
+      // Render result card
+      const card = document.createElement('div');
+      card.className = 'batch-result-card';
+      card.innerHTML = `
+        <div class="batch-result-header">
+          <span class="batch-result-repo">📦 ${repo}</span>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText(this.closest('.batch-result-card').querySelector('.batch-result-body').textContent).then(()=>showToast('Copied!','success'))">Copy</button>
+            <button class="btn btn-ghost btn-sm" onclick="downloadBatch('${repo}', this)">Download .md</button>
+          </div>
+        </div>
+        <div class="batch-result-body">${genData.changelog || ''}</div>`;
+      batchResults.appendChild(card);
+
+      saveToHistory(genData.changelog, 'batch', new Date().toLocaleDateString(), repo);
+      if (genData.usage) updateUsageDisplay(genData.usage.current, genData.usage.limit);
+
+    } catch(err) {
+      if (statusEl) { statusEl.textContent = '✕'; statusEl.className = 'batch-status error'; }
+      const errCard = document.createElement('div');
+      errCard.className = 'batch-result-card';
+      errCard.innerHTML = `<div class="batch-result-header"><span class="batch-result-repo" style="color:var(--danger);">✕ ${repo}</span></div><div class="batch-result-body" style="color:var(--danger);">${err.message}</div>`;
+      batchResults.appendChild(errCard);
+    }
+  }
+
+  runBatchBtn.disabled = false;
+  runBatchBtn.textContent = 'Run batch →';
+  showToast(`Batch complete! ${validRepos.length} processed.`, 'success');
+});
+
+window.downloadBatch = (repo, btn) => {
+  const body = btn.closest('.batch-result-card').querySelector('.batch-result-body').textContent;
+  downloadFile(`${repo.replace('/', '-')}-changelog.md`, body);
+};
+
+// ── Export / copy ──
+exportBtn.addEventListener('click', () => exportMenu.classList.toggle('open'));
+window.addEventListener('click', e => { if (!exportWrap.contains(e.target)) exportMenu.classList.remove('open'); });
+modeFormatted.addEventListener('click', () => { modeFormatted.classList.add('active'); modeRaw.classList.remove('active'); if (generatedMarkdown) renderChangelog(generatedMarkdown); });
+modeRaw.addEventListener('click', () => { modeFormatted.classList.remove('active'); modeRaw.classList.add('active'); outputArea.innerHTML = `<pre style="white-space:pre-wrap;font-family:var(--font-mono);padding:1.25rem;">${generatedMarkdown || ''}</pre>`; });
+exportMd.addEventListener('click', () => downloadFile(`${versionInput.value || 'changelog'}.md`, generatedMarkdown));
+exportTxt.addEventListener('click', () => downloadFile(`${versionInput.value || 'changelog'}.txt`, generatedMarkdown));
+exportPlain.addEventListener('click', () => { navigator.clipboard.writeText(generatedMarkdown || ''); showToast('Copied raw text', 'success'); });
+
+function downloadFile(filename, content) {
+  const blob = new Blob([content || ''], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+copyBtn.addEventListener('click', () => {
+  const text = isEditMode ? editorArea.value : (generatedMarkdown || outputArea.innerText);
+  navigator.clipboard.writeText(text).then(() => showToast('Copied!', 'success'));
+});
+
+clearBtn.addEventListener('click', () => {
+  input.value = '';
+  generatedMarkdown = '';
+  if (isEditMode) exitEditMode(false);
+  editToggleBtn.style.display = 'none';
+  shareBtn.style.display = 'none';
+  releaseBtn.style.display = 'none';
+  outputArea.innerHTML = `
+    <div class="output-placeholder">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <div class="ph-title">Your changelog will appear here</div>
+      <div class="ph-sub">Paste commits and click Generate,<br/>or fetch directly from a GitHub repo.</div>
+      <div class="example-preview">
+        <div class="ex-heading">## New Features</div>
+        <div class="ex-entry"><span class="ex-tag ex-tag-feat">new</span><span class="ex-text">Added user authentication.</span></div>
+        <div class="ex-heading" style="margin-top:0.5rem">## Bug Fixes</div>
+        <div class="ex-entry"><span class="ex-tag ex-tag-fix">fix</span><span class="ex-text">Fixed broken links in footer.</span></div>
+      </div>
+    </div>`;
+  input.dispatchEvent(new Event('input'));
+});
+
+// ── Upgrade / limit modal ──
+function showLimitUpgradeModal(data) {
+  generateBtn.disabled = false;
+  generateBtn.textContent = 'Generate changelog →';
+  showProgress(false);
+
+  // Create a modal overlay
+  const existing = document.getElementById('limit-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'limit-modal';
+  modal.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);
+    z-index:2000;display:flex;align-items:center;justify-content:center;padding:2rem;animation:fadeIn 0.2s ease;
+  `;
+
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border-hover);border-radius:var(--radius-xl);padding:2.25rem;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+      <div style="width:48px;height:48px;border-radius:50%;background:rgba(245,158,11,0.15);display:flex;align-items:center;justify-content:center;margin-bottom:1.25rem;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:0.5rem;color:var(--text);">Daily limit reached</h2>
+      <p style="font-size:0.9rem;color:var(--text-muted);margin-bottom:0.75rem;line-height:1.6;">
+        You've used all ${data.currentUsage} of your ${data.dailyLimit} daily generations.
+        Resets at midnight UTC.
+      </p>
+      <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:1.75rem;line-height:1.6;font-family:var(--font-mono);">
+        Upgrade to Pro for 50 generations/day, batch processing, and priority support.
+      </p>
+      <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+        <a href="https://forkd-ai.lemonsqueezy.com/checkout/buy/694c1134-b4a4-455a-a369-e6c584820781?checkout[custom][user_id]=${currentUser?.uid || ''}" target="_blank" style="flex:1;text-align:center;padding:0.75rem 1.25rem;border-radius:12px;font-weight:700;font-size:0.9rem;text-decoration:none;background:var(--accent);color:#000;transition:all 0.15s;" onmouseover="this.style.background='var(--text-muted)'" onmouseout="this.style.background='var(--accent)'">
+          ⚡ Upgrade to Pro — $5/mo
+        </a>
+        <button onclick="document.getElementById('limit-modal').remove()" style="flex:1;padding:0.75rem 1.25rem;border-radius:12px;font-weight:600;font-size:0.9rem;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all 0.15s;" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--border-hover)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border)'">
+          Wait until reset
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+// ── Share changelog ──
+async function shareChangelog() {
+  if (!generatedMarkdown) return showToast('Generate a changelog first', 'warn');
+  if (!currentUser) return showToast('Not logged in', 'warn');
+
+  try {
+    const idToken = await currentUser.getIdToken();
+    const response = await fetch('/shared-changelogs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+      body: JSON.stringify({
+        title: titleInput.value.trim() || 'Untitled Changelog',
+        changelog: generatedMarkdown,
+        version: versionInput.value || ''
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to share');
+
+    const shareUrl = window.location.origin + data.url;
+    await navigator.clipboard.writeText(shareUrl);
+    // Signal dashboard to refresh shared section
+    try { localStorage.setItem('forkd_shared_update', Date.now().toString()); } catch(e) {}
+    showToast(`✓ Public link copied! ${shareUrl}`, 'success');
+  } catch(err) {
+    console.error('Share error:', err);
+    showToast(`Share failed: ${err.message}`, 'warn');
+  }
+}
+
+window.shareChangelog = shareChangelog;
+
+// ── Push to GitHub Releases ──
+async function pushToGitHub() {
+  if (!generatedMarkdown) return showToast('Generate a changelog first', 'warn');
+  if (!currentUser) return showToast('Not logged in', 'warn');
+
+  // Show a prompt for version/tag and repo (pre-filled from inputs if available)
+  const repo = githubInput.value.trim() || '';
+  const tag = versionInput.value.trim() || 'v1.0.0';
+
+  // Try to parse owner/repo from github input
+  let owner = '', repoName = '';
+  if (repo.includes('/')) {
+    const parts = repo.split('/');
+    owner = parts[0];
+    repoName = parts[1];
+  }
+
+  // Build a simple inline prompt for tag and repo
+  const existing = document.getElementById('release-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'release-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:2000;display:flex;align-items:center;justify-content:center;padding:2rem;animation:fadeIn 0.2s ease;';
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border-hover);border-radius:var(--radius-xl);padding:2rem;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+      <h2 style="font-size:1.2rem;font-weight:700;margin-bottom:0.5rem;color:var(--text);">Push to GitHub Releases</h2>
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1.5rem;line-height:1.6;">Creates a new GitHub Release with this changelog as the body.</p>
+      <div style="display:flex;flex-direction:column;gap:1rem;margin-bottom:1.5rem;">
+        <div>
+          <label style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:0.35rem;">owner/repo</label>
+          <input id="release-repo-input" value="${owner ? owner + '/' + repoName : ''}" placeholder="owner/repo" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--font-mono);font-size:0.85rem;color:var(--text);outline:none;"/>
+        </div>
+        <div>
+          <label style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:0.35rem;">tag / version</label>
+          <input id="release-tag-input" value="${tag}" placeholder="v1.0.0" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--font-mono);font-size:0.85rem;color:var(--text);outline:none;"/>
+        </div>
+      </div>
+      <div style="display:flex;gap:0.75rem;">
+        <button id="release-confirm-btn" style="flex:1;padding:0.75rem;border-radius:12px;font-weight:700;font-size:0.9rem;border:none;background:var(--accent);color:#000;cursor:pointer;transition:all 0.15s;">Create Release</button>
+        <button onclick="document.getElementById('release-modal').remove()" style="flex:1;padding:0.75rem;border-radius:12px;font-weight:600;font-size:0.9rem;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all 0.15s;">Cancel</button>
+      </div>
+      <p style="font-size:0.75rem;color:var(--text-dim);margin-top:1rem;font-family:var(--font-mono);text-align:center;">Requires GITHUB_PAT configured on the server. Falls back to clipboard.</p>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  document.getElementById('release-confirm-btn').addEventListener('click', async () => {
+    const repoVal = document.getElementById('release-repo-input').value.trim();
+    const tagVal = document.getElementById('release-tag-input').value.trim();
+    if (!repoVal.includes('/')) { showToast('Enter owner/repo format', 'warn'); return; }
+    if (!tagVal) { showToast('Enter a tag/version', 'warn'); return; }
+
+    const [o, r] = repoVal.split('/');
+    const btn = document.getElementById('release-confirm-btn');
+    btn.disabled = true;
+    btn.textContent = 'Creating…';
+
+    try {
+      const idToken = await currentUser.getIdToken();
+      const response = await fetch('/github-release', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify({ owner: o, repo: r, tag_name: tagVal, name: tagVal, body: generatedMarkdown })
+      });
+      const data = await response.json();
+      
+      document.getElementById('release-modal').remove();
+
+      if (!response.ok) {
+        if (data.error === 'GitHub PAT not configured' || data.manualBody) {
+          // Fallback: copy body to clipboard, user can paste manually
+          await navigator.clipboard.writeText(generatedMarkdown);
+          showToast('GITHUB_PAT not set. Changelog copied — paste it manually.', 'warn');
+          window.open(`https://github.com/${repoVal}/releases/new?tag=${tagVal}&title=${tagVal}`, '_blank');
+        } else {
+          showToast(data.message || data.error || 'Failed to create release', 'warn');
+        }
+        return;
+      }
+
+      showToast(`✓ Release ${tagVal} created!`, 'success');
+      if (data.url) window.open(data.url, '_blank');
+    } catch(err) {
+      console.error('Release error:', err);
+      showToast(`Error: ${err.message}`, 'warn');
+    } finally {
+      if (document.getElementById('release-modal')) document.getElementById('release-modal').remove();
+    }
+  });
+}
+
+window.pushToGitHub = pushToGitHub;
+
+function showToast(msg, type = '') {
+  toast.textContent = msg;
+  toast.className = `toast ${type} show`;
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => toast.classList.remove('show'), 2500);
+}
+window.showToast = showToast;
+
+// ── Init ──
+dateInput.value = new Date().toISOString().split('T')[0];
+renderSections();
+renderHistory();
+</script>
+</body>
+</html>
